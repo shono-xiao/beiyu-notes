@@ -129,7 +129,7 @@ tr:hover td { background: #F8FAFC; }
     <div class="badge">✨ Powered by DeepSeek & Gemini 联袂开发</div>
   </div>
   <div class="header-right">
-    <span>🔒 纯本地解析，隐私安全保障</span>
+    <span>🔒 默认本地解析 · 启用AI后将发送至配置的大模型服务商</span>
     <span class="author">beiyu-notes · 江夜 & 北屿</span>
   </div>
 </header>
@@ -142,7 +142,7 @@ tr:hover td { background: #F8FAFC; }
         <div class="icon" id="jdIcon">📄</div>
         <div class="hint" id="jdHint">拖入 JD 文件至此（PDF / Word / TXT）<br>或点击选择文件</div>
       </div>
-      <input type="file" id="jdFile" accept=".pdf,.docx,.doc,.txt" style="display:none" onchange="loadJDFile(this.files[0])">
+      <input type="file" id="jdFile" accept=".pdf,.docx,.txt" style="display:none" onchange="loadJDFile(this.files[0])">
       <textarea id="jd" placeholder="也可直接在此处粘贴 JD 文本内容..."></textarea>
     </div>
 
@@ -152,7 +152,7 @@ tr:hover td { background: #F8FAFC; }
         <div class="icon" id="resumeIcon">📂</div>
         <div class="hint" id="resumeHint">将多份简历文件拖拽至此<br>支持 .pdf / .docx / .txt 格式</div>
       </div>
-      <input type="file" id="fileInput" multiple accept=".pdf,.docx,.doc,.txt" style="display:none" onchange="handleResumeFiles(this.files)">
+      <input type="file" id="fileInput" multiple accept=".pdf,.docx,.txt" style="display:none" onchange="handleResumeFiles(this.files)">
       <div class="file-list" id="fileList"></div>
     </div>
   </div>
@@ -169,7 +169,7 @@ tr:hover td { background: #F8FAFC; }
         <input type="password" id="aiKey" placeholder="输入 API Key (sk-...)">
       </div>
       <div class="ai-hint">
-        <span>💡 <b>提示：</b>使用 API 调用大模型需要向 AI 公司付费。如果嫌注册填 Key 太麻烦，可以撒娇找姐姐提供“爱心经济支持” 💖</span>
+        <span>💡 <b>提示：</b>使用 API 调用大模型需要向 AI 公司付费，推荐使用 DeepSeek 物美价廉。API Key 需要自己申请，如果嫌麻烦，可以撒娇找姐姐提供“爱心经济支持” 💖</span>
       </div>
     </div>
   </div>
@@ -221,7 +221,10 @@ async function parseFile(file) {
       pages.push(content.items.map(it => it.str).join(' '));
     }
     return pages.join('\n');
-  } else if (file.name.endsWith('.docx') || file.name.endsWith('.doc')) {
+  } else if (file.name.endsWith('.doc')) {
+      alert('暂不支持 .doc 格式，请用 Word 另存为 .docx 后重新上传');
+      return '';
+    } else if (file.name.endsWith('.docx')) {
     const buf = await file.arrayBuffer();
     const result = await mammoth.extractRawText({ arrayBuffer: buf });
     return result.value;
@@ -388,7 +391,7 @@ function analyzeLocal(jd) {
       let found = false;
       for (const rk of resumeKw) {
         const rkL = rk.toLowerCase();
-        if (kwL === rkL || kwL.includes(rkL) || rkL.includes(kwL)) { matched.push(kw); found = true; break; }
+        if (kwL === rkL) { matched.push(kw); found = true; break; }
       }
       if (!found) missing.push(kw);
     }
@@ -423,7 +426,11 @@ async function analyzeWithAI(jd) {
     </tr>
   `;
 
-  const promises = files.map(async (f) => {
+  const batchSize = 3;
+  const allResults = [];
+  for (let i = 0; i < files.length; i += batchSize) {
+    const batch = files.slice(i, i + batchSize);
+    const batchPromises = batch.map(async (f) => {
     try {
       const res = await fetch(baseUrl, {
         method: 'POST',
@@ -471,30 +478,34 @@ async function analyzeWithAI(jd) {
       console.error("AI 匹配异常:", f.name, e);
       return { name: f.candidateName, fileName: f.name, score: 0, matched: [], missing: [], reason: `API 调用失败: ${e.message}`, isAI: true };
     }
-  });
+    });
+    const batchResults = await Promise.all(batchPromises);
+    allResults.push(...batchResults);
+  }
 
-  const results = await Promise.all(promises);
+  const results = allResults;
   results.sort((a, b) => b.score - a.score);
   renderTable(results);
 }
 
 // 渲染结果表格
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function renderTable(results) {
   let html = '';
   results.forEach((r, idx) => {
     const dotClass = r.score >= 70 ? 'high' : r.score >= 40 ? 'mid' : 'low';
     html += `<tr>
       <td><span style="color:var(--text-muted); font-weight:700; font-size:18px;">${idx+1}</span></td>
-      <td><a href="javascript:void(0)" onclick="toggleDetail('d${idx}')" style="color:var(--primary);text-decoration:none;font-weight:600">${r.name}</a></td>
+      <td><a href="javascript:void(0)" onclick="toggleDetail('d${idx}')" style="color:var(--primary);text-decoration:none;font-weight:600">${esc(r.name)}</a></td>
       <td><span class="score-dot ${dotClass}"></span><strong style="color:var(--text-main);font-size:16px;">${r.score}%</strong></td>
-      <td style="color:var(--text-muted);font-size:13px">${r.fileName}</td>
+      <td style="color:var(--text-muted);font-size:13px">${esc(r.fileName)}</td>
       <td><button class="btn-sm" onclick="toggleDetail('d${idx}')">查看详情</button></td>
     </tr>
     <tr class="detail-row" id="d${idx}">
       <td colspan="5">
-        ${r.isAI ? `<div style="margin-bottom:16px; padding:12px 16px; background:#EFF6FF; border-radius:8px; border-left:4px solid var(--primary);"><strong style="color:#1E40AF;">🤖 AI 评价：</strong><span style="color:#1E3A8A; font-size:14px; line-height:1.6; margin-left:8px;">${r.reason}</span></div>` : ''}
-        <div style="margin:8px 0"><strong style="color:var(--success)">✅ 命中/具备技能 (${r.matched.length})：</strong><br>${r.matched.length ? r.matched.slice(0,15).map(k=>`<span class="tag match">${k}</span>`).join(' ') : '<span style="color:#94A3B8;font-size:13px;">（未识别出匹配项）</span>'}</div>
-        <div style="margin:16px 0 8px 0"><strong style="color:var(--text-muted)">❌ JD提及但未体现 (${r.missing.length})：</strong><br>${r.missing.length ? r.missing.slice(0,10).map(k=>`<span class="tag missing">${k}</span>`).join(' ') + (r.missing.length>10?' <span style="font-size:12px;color:#94A3B8;">...等项</span>':'') : '<span style="color:#94A3B8;font-size:13px;">（完美覆盖！）</span>'}</div>
+        ${r.isAI ? `<div style="margin-bottom:16px; padding:12px 16px; background:#EFF6FF; border-radius:8px; border-left:4px solid var(--primary);"><strong style="color:#1E40AF;">🤖 AI 评价：</strong><span style="color:#1E3A8A; font-size:14px; line-height:1.6; margin-left:8px;">${esc(r.reason)}</span></div>` : ''}
+        <div style="margin:8px 0"><strong style="color:var(--success)">✅ 命中/具备技能 (${r.matched.length})：</strong><br>${r.matched.length ? r.matched.slice(0,15).map(k=>`<span class="tag match">${esc(k)}</span>`).join(' ') : '<span style="color:#94A3B8;font-size:13px;">（未识别出匹配项）</span>'}</div>
+        <div style="margin:16px 0 8px 0"><strong style="color:var(--text-muted)">❌ JD提及但未体现 (${r.missing.length})：</strong><br>${r.missing.length ? r.missing.slice(0,10).map(k=>`<span class="tag missing">${esc(k)}</span>`).join(' ') + (r.missing.length>10?' <span style="font-size:12px;color:#94A3B8;">...等项</span>':'') : '<span style="color:#94A3B8;font-size:13px;">（完美覆盖！）</span>'}</div>
         ${!r.isAI ? `<div style="color:#94A3B8;font-size:12px;margin-top:16px;border-top:1px dashed #E2E8F0;padding-top:12px;">💡 提示：当前为纯本地规则匹配，对同义词包容度较低。推荐开启「AI 深度匹配」获取更智能的解读。</div>` : ''}
       </td>
     </tr>`;
