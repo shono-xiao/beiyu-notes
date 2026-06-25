@@ -15,23 +15,23 @@ body{font-family:-apple-system,"Microsoft YaHei",sans-serif;background:#1a1a2e;c
 .main{flex:1;padding:24px;overflow-y:auto}
 .card{background:#16213e;border-radius:12px;padding:20px;margin-bottom:16px}
 .card h3{color:#e94560;margin-bottom:12px;font-size:14px;text-transform:uppercase;letter-spacing:1px}
-textarea{width:100%;min-height:120px;background:#0f3460;border:1px solid #333;border-radius:8px;color:#e0e0e0;padding:14px;font-size:14px;resize:vertical;font-family:inherit}
+textarea{width:100%;min-height:100px;background:#0f3460;border:1px solid #333;border-radius:8px;color:#e0e0e0;padding:14px;font-size:14px;resize:vertical;font-family:inherit}
 textarea:focus{outline:none;border-color:#e94560}
 .btn{background:#e94560;color:#fff;border:none;padding:12px 32px;border-radius:8px;cursor:pointer;font-size:15px;font-weight:600;transition:background .2s}
 .btn:hover{background:#c73852}
 .btn:disabled{background:#444;cursor:not-allowed}
-.drop-zone{border:2px dashed #444;border-radius:12px;padding:40px;text-align:center;color:#888;cursor:pointer;transition:all .3s;margin-bottom:12px}
+.drop-zone{border:2px dashed #444;border-radius:12px;padding:20px 40px;text-align:center;color:#888;cursor:pointer;transition:all .3s;margin-bottom:8px}
 .drop-zone:hover,.drop-zone.drag{border-color:#e94560;background:rgba(233,69,96,.05);color:#e94560}
-.drop-zone .icon{font-size:40px;margin-bottom:8px}
-.drop-zone .hint{font-size:13px}
+.drop-zone .icon{font-size:24px;margin-bottom:4px}
+.drop-zone .hint{font-size:12px}
+.drop-zone.jd-loaded{border-color:#00d4aa;background:rgba(0,212,170,.05);color:#00d4aa}
+.drop-zone.jd-loaded .icon::after{content:' ✅'}
 table{width:100%;border-collapse:collapse;margin-top:12px}
-th{text-align:left;padding:10px 14px;font-size:12px;color:#888;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #333}
+th{text-align:left;padding:10px 14px;font-size:12px;color:#888;border-bottom:1px solid #333}
 td{padding:12px 14px;border-bottom:1px solid #1a1a2e;font-size:13px}
 tr:hover{background:rgba(233,69,96,.05)}
 .score-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
-.score-dot.high{background:#00d4aa}
-.score-dot.mid{background:#e9a820}
-.score-dot.low{background:#888}
+.score-dot.high{background:#00d4aa}.score-dot.mid{background:#e9a820}.score-dot.low{background:#888}
 .tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;margin:1px}
 .tag.match{background:rgba(0,212,170,.15);color:#00d4aa}
 .tag.missing{background:rgba(136,136,136,.15);color:#888}
@@ -42,115 +42,133 @@ tr:hover{background:rgba(233,69,96,.05)}
 .file-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .file-chip{background:#0f3460;border-radius:8px;padding:6px 12px;font-size:12px;display:flex;align-items:center;gap:6px}
 .file-chip .remove{cursor:pointer;color:#e94560;margin-left:4px}
-.status{font-size:12px;margin-top:8px}
-.status.ok{color:#00d4aa}
-.status.err{color:#e94560}
 </style>
 </head>
 <body>
 <div class="sidebar">
   <h2>📋 批量简历匹配</h2>
-  <p>拖入PDF/Word简历文件，一次对比多份，自动排名。</p>
-  <p style="margin-top:8px">所有处理在浏览器本地完成，不上传任何数据。</p>
+  <p>拖入JD文件和简历文件，自动解析、自动排名。</p>
+  <p style="margin-top:8px">全部本地处理，数据不出浏览器。</p>
   <p style="margin-top:auto;padding-top:24px;color:#555;font-size:11px">beiyu-notes<br>江夜 & 北屿 · 2026.06</p>
 </div>
 <div class="main">
   <div class="card">
-    <h3>📌 怎么用</h3>
+    <h3>📌 步骤</h3>
     <p style="color:#888;font-size:13px;line-height:2">
-      1. 贴一份 <b>职位描述（JD）</b><br>
-      2. <b>拖入</b> 多份简历文件（PDF / Word / 纯文本）<br>
-      3. 点 <b>「批量匹配」</b>——自动排名
+      1. <b>拖JD文件</b> 到上面（或粘贴文本）<br>
+      2. <b>拖简历文件</b> 到下面（PDF/Word/文本，可多选）<br>
+      3. 点 <b>「批量匹配」</b>
     </p>
   </div>
 
   <div class="card">
-    <h3>📝 职位描述 (JD)</h3>
-    <textarea id="jd" placeholder="粘贴职位描述...&#10;&#10;例如：&#10;负责AI Agent产品的用户侧交互设计...&#10;熟悉LLM应用、Prompt Engineering...&#10;具备Skill开发和全链路策略设计经验..."></textarea>
+    <h3>📝 职位描述 (JD) <span style="color:#888;font-size:12px;font-weight:normal">—— 拖文件或粘贴文本</span></h3>
+    <div class="drop-zone" id="jdDrop" onclick="document.getElementById('jdFile').click()">
+      <div class="icon">📄</div>
+      <div class="hint">拖入JD文件到这里（PDF/Word/文本）<br>或点击选择 · 也可以直接粘贴文本</div>
+    </div>
+    <input type="file" id="jdFile" accept=".pdf,.docx,.doc,.txt" style="display:none" onchange="loadJDFile(this.files[0])">
+    <textarea id="jd" placeholder="粘贴JD文本（拖文件会自动填入）..."></textarea>
   </div>
 
   <div class="card">
-    <h3>👥 简历文件 <span style="color:#888;font-size:12px;font-weight:normal">—— 拖拽或点击上传</span></h3>
-    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+    <h3>👥 简历文件 <span style="color:#888;font-size:12px;font-weight:normal">—— 拖文件（可多选）</span></h3>
+    <div class="drop-zone" id="resumeDrop" onclick="document.getElementById('fileInput').click()">
       <div class="icon">📂</div>
-      <div class="hint">拖拽 PDF / Word / 文本文件到此处<br>或点击选择文件（可多选）</div>
+      <div class="hint">拖入简历文件到这里（PDF/Word/文本，可多选）</div>
     </div>
-    <input type="file" id="fileInput" multiple accept=".pdf,.docx,.doc,.txt" style="display:none" onchange="handleFiles(this.files)">
+    <input type="file" id="fileInput" multiple accept=".pdf,.docx,.doc,.txt" style="display:none" onchange="handleResumeFiles(this.files)">
     <div class="file-list" id="fileList"></div>
-    <div class="status" id="fileStatus"></div>
   </div>
 
   <div style="text-align:center;margin:16px 0">
-    <button class="btn" id="analyzeBtn" onclick="batchAnalyze()" style="font-size:16px;padding:14px 48px">🔍 批量匹配 (<span id="resumeCount">0</span> 份简历)</button>
+    <button class="btn" onclick="batchAnalyze()" style="font-size:16px;padding:14px 48px">🔍 批量匹配 (<span id="resumeCount">0</span> 份)</button>
   </div>
 
   <div class="card" id="resultCard" style="display:none">
     <h3>📊 匹配排名</h3>
-    <table><thead><tr><th>排名</th><th>候选人</th><th>匹配度</th><th>文件名</th><th>操作</th></tr></thead><tbody id="resultTable"></tbody></table>
+    <table><thead><tr><th>排名</th><th>候选人</th><th>匹配度</th><th>文件名</th><th></th></tr></thead><tbody id="resultTable"></tbody></table>
   </div>
 </div>
 
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
 const files = [];
 
-const dropZone = document.getElementById('dropZone');
-dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
-dropZone.addEventListener('drop', e => {
-  e.preventDefault();
-  dropZone.classList.remove('drag');
-  handleFiles(e.dataTransfer.files);
+async function parseFile(file) {
+  if (file.name.endsWith('.pdf')) {
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    const pages = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      pages.push(content.items.map(it => it.str).join(' '));
+    }
+    return pages.join('\n');
+  } else if (file.name.endsWith('.docx') || file.name.endsWith('.doc')) {
+    const buf = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer: buf });
+    return result.value;
+  } else {
+    return await file.text();
+  }
+}
+
+async function loadJDFile(file) {
+  if (!file) return;
+  try {
+    const text = await parseFile(file);
+    document.getElementById('jd').value = text.substring(0, 10000);
+    document.getElementById('jdDrop').classList.add('jd-loaded');
+    document.getElementById('jdDrop').querySelector('.hint').textContent = '✅ 已加载：' + file.name;
+  } catch(e) {
+    alert('JD文件解析失败：' + file.name);
+  }
+}
+
+document.getElementById('jdDrop').addEventListener('dragover', e => { e.preventDefault(); e.currentTarget.classList.add('drag'); });
+document.getElementById('jdDrop').addEventListener('dragleave', e => { e.currentTarget.classList.remove('drag'); });
+document.getElementById('jdDrop').addEventListener('drop', e => {
+  e.preventDefault(); e.currentTarget.classList.remove('drag');
+  loadJDFile(e.dataTransfer.files[0]);
 });
 
-async function handleFiles(fileList) {
+const resumeDrop = document.getElementById('resumeDrop');
+resumeDrop.addEventListener('dragover', e => { e.preventDefault(); resumeDrop.classList.add('drag'); });
+resumeDrop.addEventListener('dragleave', () => resumeDrop.classList.remove('drag'));
+resumeDrop.addEventListener('drop', e => {
+  e.preventDefault(); resumeDrop.classList.remove('drag');
+  handleResumeFiles(e.dataTransfer.files);
+});
+
+async function handleResumeFiles(fileList) {
   for (const f of fileList) {
     try {
-      let text = '';
-      if (f.name.endsWith('.pdf')) {
-        const buf = await f.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-        const pages = [];
-        for (let i = 1; i <= pdf.numPages; i++) {
-          const page = await pdf.getPage(i);
-          const content = await page.getTextContent();
-          pages.push(content.items.map(it => it.str).join(' '));
-        }
-        text = pages.join('\n');
-      } else if (f.name.endsWith('.docx') || f.name.endsWith('.doc')) {
-        const buf = await f.arrayBuffer();
-        const result = await mammoth.extractRawText({ arrayBuffer: buf });
-        text = result.value;
-      } else {
-        text = await f.text();
-      }
-      // Extract name: first line, clean up
+      const text = await parseFile(f);
       const lines = text.split('\n').filter(l => l.trim());
       const name = lines[0]?.replace(/[|｜\s\-:：—–].*$/, '').trim() || f.name.replace(/\.[^.]+$/, '');
-      files.push({ name: f.name, candidateName: name, text: text.substring(0, 5000), raw: text });
-      updateFileList();
-    } catch (e) {
-      document.getElementById('fileStatus').innerHTML += `<div class="status err">❌ ${f.name}: 解析失败</div>`;
+      files.push({ name: f.name, candidateName: name, text: text.substring(0, 8000), raw: text });
+    } catch(e) {
+      files.push({ name: f.name, candidateName: f.name, text: '【解析失败】', raw: '' });
     }
   }
   document.getElementById('fileInput').value = '';
+  updateFileList();
 }
-document.getElementById('fileInput').addEventListener('change', function() { handleFiles(this.files); });
+document.getElementById('fileInput').addEventListener('change', function() { handleResumeFiles(this.files); });
 
 function updateFileList() {
   document.getElementById('fileList').innerHTML = files.map((f, i) =>
     `<div class="file-chip">📄 ${f.name} <span style="color:#888">(${f.candidateName})</span><span class="remove" onclick="removeFile(${i})">✕</span></div>`
   ).join('');
   document.getElementById('resumeCount').textContent = files.length;
-  if (files.length > 0) document.getElementById('fileStatus').innerHTML = `<div class="status ok">✅ 已加载 ${files.length} 份简历</div>`;
 }
-
 function removeFile(i) { files.splice(i, 1); updateFileList(); }
 
 const AI_PATTERNS = [
   /\b(AI|人工智能|agent|智能体|大模型|LLM|GPT|Claude|DeepSeek|通义|文心|豆包|Grok|Gemini|Copilot|Codex|Cursor|OpenAI|Anthropic)\b/gi,
-  /\b(skill|技能|prompt|提示词|RAG|检索增强|function.?call|工具调用|tool.?use|MCP|plugin|插件|API|微调|fine.?tun|embedding|向量|RLHF|SFT|对齐|alignment)\b/gi,
+  /\b(skill|技能|prompt|提示词|RAG|检索增强|function.?call|工具调用|tool.?use|MCP|plugin|插件|API|微调|fine.?tun|embedding|向量|RLHF|SFT|对齐)\b/gi,
   /\b(agentic|自主|规划|planning|reasoning|推理|chain.?of.?thought|思维链|multi.?agent|多智能体|orchestrat|编排|workflow|工作流|pipeline|全链路|端到端)\b/gi,
   /\b(策略|strategy|产品|product|用户|user|体验|UX|交互|interaction|设计|design|数据|data|分析|analytics|指标|metric|AB|实验|增长|转化|留存)\b/gi,
   /\b(Python|Java|TypeScript|React|Vue|Node|FastAPI|Flask|Docker|K8s|k8s|云原生|cloud|Git|Linux|SQL|MongoDB|Redis)\b/gi,
@@ -171,18 +189,15 @@ function extractKeywords(text) {
 
 function batchAnalyze() {
   const jd = document.getElementById('jd').value.trim();
-  if (!jd) { alert('请先粘贴职位描述（JD）'); return; }
-  if (files.length === 0) { alert('请先上传简历文件'); return; }
+  if (!jd) { alert('请先填写或拖入职位描述（JD）'); return; }
+  if (files.length === 0) { alert('请先拖入简历文件'); return; }
 
   const jdKw = extractKeywords(jd);
   const results = [];
-
   for (const f of files) {
     const resumeKw = extractKeywords(f.text);
-    const jdSet = new Set(jdKw);
-    const resumeSet = new Set(resumeKw);
+    const jdSet = new Set(jdKw), resumeSet = new Set(resumeKw);
     let matched = [], missing = [];
-
     for (const kw of jdKw) {
       let found = false;
       for (const rk of resumeKw) {
@@ -190,41 +205,29 @@ function batchAnalyze() {
       }
       if (!found) missing.push(kw);
     }
-
     const total = jdKw.length || 1;
     const overlap = [...jdSet].filter(k => resumeSet.has(k)).length;
-    const overlapBonus = (overlap / Math.max(jdSet.size, 1)) * 0.3;
-    const score = Math.min(100, Math.round((matched.length / total) * 70 + overlapBonus * 100));
-
-    matched = [...new Set(matched)];
-    missing = [...new Set(missing)];
-
-    results.push({
-      name: f.candidateName, fileName: f.name, score,
-      matched, missing,
-      brief: f.text.substring(0, 300).replace(/\n/g, ' ')
-    });
+    const score = Math.min(100, Math.round((matched.length / total) * 70 + (overlap / Math.max(jdSet.size, 1)) * 30));
+    matched = [...new Set(matched)]; missing = [...new Set(missing)];
+    results.push({ name: f.candidateName, fileName: f.name, score, matched, missing });
   }
-
   results.sort((a, b) => b.score - a.score);
 
   let html = '';
   results.forEach((r, idx) => {
     const dotClass = r.score >= 70 ? 'high' : r.score >= 40 ? 'mid' : 'low';
-    const status = r.score >= 70 ? '✅ 推荐' : r.score >= 40 ? '⚠️ 待定' : '❌ 不推荐';
     html += `<tr>
       <td><span class="counter">${idx+1}</span></td>
-      <td><a href="javascript:void(0)" onclick="toggleDetail('d${idx}')" style="color:#e0e0e0;text-decoration:none;font-weight:600">${r.name}</a><br><small style="color:#888">${status}</small></td>
+      <td><a href="javascript:void(0)" onclick="toggleDetail('d${idx}')" style="color:#e0e0e0;text-decoration:none;font-weight:600">${r.name}</a></td>
       <td><span class="score-dot ${dotClass}"></span><strong>${r.score}%</strong></td>
       <td style="color:#888;font-size:12px">${r.fileName}</td>
-      <td><button class="btn-sm" onclick="toggleDetail('d${idx}')" style="font-size:12px">展开</button></td>
+      <td><button class="btn-sm" onclick="toggleDetail('d${idx}')" style="font-size:12px;background:#0f3460;color:#e0e0e0;border:1px solid #333;padding:6px 14px;border-radius:6px;cursor:pointer">展开</button></td>
     </tr>
     <tr class="detail-row" id="d${idx}">
       <td colspan="5">
-        <div style="margin:4px 0"><strong>前300字：</strong><br><span style="color:#aaa;font-size:12px">${r.brief}...</span></div>
         <div style="margin:8px 0"><strong style="color:#00d4aa">✅ 匹配 (${r.matched.length})：</strong>${r.matched.length ? r.matched.slice(0,15).map(k=>'<span class="tag match">'+k+'</span>').join(' ') : '（无直接关键词匹配）'}</div>
         <div style="margin:8px 0"><strong style="color:#888">❌ 缺失 (${r.missing.length})：</strong>${r.missing.length ? r.missing.slice(0,10).map(k=>'<span class="tag missing">'+k+'</span>').join(' ') + (r.missing.length>10?' ...等'+r.missing.length+'项':'') : '（完全覆盖）'}</div>
-        <div style="margin:8px 0;color:#888;font-size:12px">💡 关键词匹配仅供参考——候选人可能用不同表述描述相同能力。</div>
+        <div style="color:#666;font-size:12px">💡 关键词匹配仅供参考——候选人可能用不同表述描述相同能力。</div>
       </td>
     </tr>`;
   });
@@ -237,6 +240,13 @@ function toggleDetail(id) {
   const row = document.getElementById(id);
   if (row) row.classList.toggle('show');
 }
+
+document.getElementById('jd').addEventListener('input', function() {
+  if (this.value.trim()) {
+    document.getElementById('jdDrop').classList.add('jd-loaded');
+    document.getElementById('jdDrop').querySelector('.hint').textContent = '✅ 已粘贴文本';
+  }
+});
 </script>
 </body>
 </html>
