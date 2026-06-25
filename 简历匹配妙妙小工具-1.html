@@ -55,7 +55,7 @@ body {
 
 /* 主工作区 */
 .main { flex: 1; padding: 32px; max-width: 1400px; margin: 0 auto; width: 100%; }
-.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(480px, 1fr)); gap: 24px; margin-bottom: 24px; }
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 24px; margin-bottom: 24px; }
 
 .card {
   background: var(--card-bg);
@@ -172,7 +172,13 @@ tr:hover td { background: #F8FAFC; }
       <div class="api-inputs">
         <input type="text" id="aiBaseUrl" value="https://api.deepseek.com/v1" placeholder="Base URL (默认为 DeepSeek)">
         <input type="text" id="aiModel" value="deepseek-v4-pro" placeholder="Model Name (如 deepseek-v4-pro)">
-        <input type="password" id="aiKey" placeholder="输入 API Key (sk-...)">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <input type="password" id="aiKey" placeholder="输入 API Key (sk-...)" style="flex:1">
+          <label class="switch-label" style="font-size:13px; white-space:nowrap; margin:0;">
+            <input type="checkbox" id="rememberKey" style="width:16px;height:16px;">
+            🔑 记住 Key
+          </label>
+        </div>
       </div>
       <div class="ai-hint">
         <span>💡 <b>提示:</b>使用 API 调用大模型需要向 AI 公司付费,推荐使用 DeepSeek 物美价廉。API Key 需要自己申请,如果嫌麻烦,可以撒娇找姐姐提供"爱心经济支持" 💖</span>
@@ -209,6 +215,7 @@ tr:hover td { background: #F8FAFC; }
 
 <script>
 // 基础逻辑及解析器加载
+// PDF Worker 主 CDN；若 CDN 故障会降级提示而非静默失败
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 const files = [];
 let pendingToasts = []; // 用于收集弹窗信息防止轰炸
@@ -229,22 +236,65 @@ function toggleAI() {
   panel.classList.toggle('show', isChecked);
 }
 
+// localStorage 持久化：页面加载时恢复 Key / URL / Model
+(function restoreSettings() {
+  const saved = ['aiBaseUrl', 'aiModel', 'aiKey', 'rememberKey'];
+  saved.forEach(id => {
+    const val = localStorage.getItem('hr_tool_' + id);
+    if (val !== null) {
+      const el = document.getElementById(id);
+      if (el.type === 'checkbox') el.checked = (val === 'true');
+      else el.value = val;
+    }
+  });
+})();
+
+// 记住 Key 切换 & 输入时自动保存
+['aiBaseUrl', 'aiModel'].forEach(id => {
+  document.getElementById(id).addEventListener('input', function () {
+    localStorage.setItem('hr_tool_' + id, this.value);
+  });
+});
+
+document.getElementById('aiKey').addEventListener('input', function () {
+  if (document.getElementById('rememberKey').checked) {
+    localStorage.setItem('hr_tool_aiKey', this.value);
+  }
+});
+
+document.getElementById('rememberKey').addEventListener('change', function () {
+  localStorage.setItem('hr_tool_rememberKey', this.checked);
+  if (this.checked) {
+    // 刚勾选时，把当前已输入的 Key 存进去
+    const key = document.getElementById('aiKey').value;
+    if (key) localStorage.setItem('hr_tool_aiKey', key);
+  } else {
+    // 取消勾选时清除已存的 Key
+    localStorage.removeItem('hr_tool_aiKey');
+  }
+});
+
 // 文件解析逻辑 (无弹窗打断版)
 async function parseFile(file) {
   if (file.name.endsWith('.pdf')) {
-    const buf = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-    const pages = [];
-    const maxPages = 20;
-    for (let i = 1; i <= Math.min(pdf.numPages, maxPages); i++) {
-      const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      pages.push(content.items.map(it => it.str).join(' '));
+    try {
+      const buf = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+      const pages = [];
+      const maxPages = 20;
+      for (let i = 1; i <= Math.min(pdf.numPages, maxPages); i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        pages.push(content.items.map(it => it.str).join(' '));
+      }
+      if (pdf.numPages > maxPages) {
+        pendingToasts.push(`📄 [${file.name}] 已截取前 ${maxPages} 页`);
+      }
+      return pages.join('\n');
+    } catch (e) {
+      pendingToasts.push(`❌ [${file.name}] PDF 解析失败（可能是扫描件或 CDN 加载异常），请尝试粘贴文本`);
+      return '';
     }
-    if (pdf.numPages > maxPages) {
-      pendingToasts.push(`📄 [${file.name}] 已截取前 ${maxPages} 页`);
-    }
-    return pages.join('\n');
   } else if (file.name.endsWith('.doc')) {
       pendingToasts.push(`⚠️ 暂不支持 .doc 格式,请用 Word 另存为 .docx 后重新上传`);
       return '';
@@ -318,12 +368,21 @@ async function handleResumeFiles(fileList) {
   for (const f of fileList) {
     try {
       const text = await parseFile(f);
+
+      // .doc 等不支持的格式，parseFile 已弹提示，跳过不添加到列表
+      if (!text.trim()) {
+        if (!f.name.endsWith('.doc')) {
+          pendingToasts.push(`⚠️ [${f.name}] 文件内容为空，已跳过`);
+        }
+        continue;
+      }
+
       const lines = text.split('\n').filter(l => l.trim());
-      
+
       // 优化后的姓名提取：去除后缀名和常见修饰词，最大程度保留原本名字
       let fnName = f.name.replace(/\.[^.]+$/, '').replace(/[-_]?(的?简历|resume|cv|前端|后端|开发|工程师).*$/i, '').trim();
       const name = fnName && fnName.length <= 15 ? fnName : (lines[0]?.replace(/[|｜\s\-:：—–].*$/, '').trim() || f.name.replace(/\.[^.]+$/, ''));
-      
+
       files.push({ name: f.name, candidateName: name, text: text.substring(0, 8000) });
       
       // 扫描件/图片PDF检测
@@ -513,8 +572,11 @@ async function analyzeWithAI(jd) {
     "熬夜容易秃头长痘痘，今晚也要早点睡哦 🌙"
   ];
 
-  // 数组乱序（洗牌算法），保证每次看到的顺序都不一样
-  messages.sort(() => Math.random() - 0.5);
+  // Fisher-Yates 洗牌，保证每个位置真正等概率
+  for (let i = messages.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [messages[i], messages[j]] = [messages[j], messages[i]];
+  }
 
   let msgIndex = 0;
   // 设置 4 秒一换的定时器
@@ -604,7 +666,7 @@ async function analyzeWithAI(jd) {
           if (data.error) throw new Error(data.error.message);
 
           let content = data.choices[0].message.content;
-          const jsonMatch = content.match(/\{[\s\S]*\}/);
+          const jsonMatch = content.match(/\{[\s\S]*?\}/);
           if (jsonMatch) content = jsonMatch[0];
           
           const result = JSON.parse(content);
