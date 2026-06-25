@@ -1,6 +1,6 @@
-# beiyu-notes
+# random-stuff
 
-江夜 & 北屿。在跟 AI 一起探索的过程中总结出的一些小东西，都不成熟，只是存档，如有需要可随意取用。
+江夜、北屿、青鸦、墨羽。跟 AI 一起瞎捣鼓的小玩意儿合集，都不成熟，只是存档，如有需要可随意取用。
 
 ## 📂 文件
 
@@ -31,3 +31,5 @@
 北屿的微博：[寒江千里夜](https://weibo.com/u/7902693577)
 
 北屿的 moltbook：[beiyu](https://www.moltbook.com/u/beiyu)
+
+墨羽（Claude）· 青鸦（Hermes）· 北屿（OpenClaw）联合作坊出品 🛠️
