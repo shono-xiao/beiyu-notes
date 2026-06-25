@@ -9,10 +9,10 @@
 <style>
 /* 基础重置与变量 */
 :root {
-  --primary: #4F46E5;       /* 靛蓝主色 */
+  --primary: #4F46E5;
   --primary-hover: #4338CA;
-  --header-bg: #0F172A;     /* 顶部导航深邃蓝灰 */
-  --bg-color: #F8FAFC;      /* 极光灰背景 */
+  --header-bg: #0F172A;
+  --bg-color: #F8FAFC;
   --card-bg: #FFFFFF;
   --text-main: #1E293B;
   --text-muted: #64748B;
@@ -34,7 +34,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* 顶部导航:窄一点漂亮点,严肃高级 */
+/* 顶部导航 */
 .header {
   height: 64px;
   background: var(--header-bg);
@@ -53,7 +53,7 @@ body {
 .header-right { display: flex; align-items: center; gap: 24px; color: #94A3B8; font-size: 13px; }
 .author { color: #64748B; font-size: 12px; border-left: 1px solid rgba(255,255,255,0.1); padding-left: 24px; }
 
-/* 主工作区:居中对齐,留白呼吸感 */
+/* 主工作区 */
 .main { flex: 1; padding: 32px; max-width: 1400px; margin: 0 auto; width: 100%; }
 .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(480px, 1fr)); gap: 24px; margin-bottom: 24px; }
 
@@ -106,7 +106,6 @@ tr:hover td { background: #F8FAFC; }
 .tag { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; margin: 3px 2px; }
 .tag.match { background: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; }
 .tag.missing { background: #F1F5F9; color: #64748B; border: 1px solid #E2E8F0; }
-.tag.ai { background: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE; font-weight: 600;}
 
 /* 详情折叠面板 */
 .detail-row { display: none; }
@@ -119,6 +118,11 @@ tr:hover td { background: #F8FAFC; }
 .file-chip:hover { background: #E2E8F0; }
 .file-chip .remove { cursor: pointer; color: var(--text-muted); font-weight: bold; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; transition: 0.2s; }
 .file-chip .remove:hover { color: var(--danger); background: #FEE2E2; }
+
+/* Toast提示框 */
+#toast-container { position: fixed; top: 80px; right: 32px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
+.toast { background: #1E293B; color: #F8FAFC; padding: 12px 20px; border-radius: 8px; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); animation: slideInRight 0.3s ease forwards; opacity: 0; transform: translateX(100%); }
+@keyframes slideInRight { to { opacity: 1; transform: translateX(0); } }
 </style>
 </head>
 <body>
@@ -135,6 +139,7 @@ tr:hover td { background: #F8FAFC; }
 </header>
 
 <div class="main">
+  <div id="toast-container"></div>
   <div class="grid-2">
     <div class="card" style="margin-bottom:0">
       <h3>📝 职位描述 (JD) <span style="color:var(--text-muted); font-size:13px; font-weight:normal; margin-left:8px;">拖入文件或粘贴文本</span></h3>
@@ -165,7 +170,7 @@ tr:hover td { background: #F8FAFC; }
     <div class="ai-settings" id="aiSettings">
       <div class="api-inputs">
         <input type="text" id="aiBaseUrl" value="https://api.deepseek.com/v1" placeholder="Base URL (默认为 DeepSeek)">
-        <input type="text" id="aiModel" value="deepseek-v4-pro" placeholder="Model Name (如 deepseek-v4-pro)">
+        <input type="text" id="aiModel" value="deepseek-chat" placeholder="Model Name (如 deepseek-chat)">
         <input type="password" id="aiKey" placeholder="输入 API Key (sk-...)">
       </div>
       <div class="ai-hint">
@@ -173,7 +178,7 @@ tr:hover td { background: #F8FAFC; }
       </div>
       <label class="switch-label" style="margin-top:12px;font-size:14px;">
         <input type="checkbox" id="genQuestions" style="width:18px;height:18px;">
-        🎯 为每个候选人自动生成面试追问
+        🎯 为每个候选人自动生成建议
       </label>
     </div>
   </div>
@@ -205,6 +210,16 @@ tr:hover td { background: #F8FAFC; }
 // 基础逻辑及解析器加载
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 const files = [];
+let pendingToasts = []; // 用于收集弹窗信息防止轰炸
+
+function showToast(msg) {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.textContent = msg;
+  container.appendChild(toast);
+  setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
+}
 
 // AI 设置面板开关
 function toggleAI() {
@@ -213,7 +228,7 @@ function toggleAI() {
   panel.classList.toggle('show', isChecked);
 }
 
-// 修复过的文件解析逻辑 (增加异步延迟,防止浏览器假死)
+// 文件解析逻辑 (无弹窗打断版)
 async function parseFile(file) {
   if (file.name.endsWith('.pdf')) {
     const buf = await file.arrayBuffer();
@@ -226,13 +241,13 @@ async function parseFile(file) {
       pages.push(content.items.map(it => it.str).join(' '));
     }
     if (pdf.numPages > maxPages) {
-      alert('📄 ' + file.name + ' 共 ' + pdf.numPages + ' 页,仅解析前 ' + maxPages + ' 页。大文件建议提取关键页后再上传。');
+      pendingToasts.push(`📄 [${file.name}] 已截取前 ${maxPages} 页`);
     }
     return pages.join('\n');
   } else if (file.name.endsWith('.doc')) {
-      alert('暂不支持 .doc 格式,请用 Word 另存为 .docx 后重新上传');
+      pendingToasts.push(`⚠️ 暂不支持 .doc 格式,请用 Word 另存为 .docx 后重新上传`);
       return '';
-    } else if (file.name.endsWith('.docx')) {
+  } else if (file.name.endsWith('.docx')) {
     const buf = await file.arrayBuffer();
     const result = await mammoth.extractRawText({ arrayBuffer: buf });
     return result.value;
@@ -244,12 +259,12 @@ async function parseFile(file) {
 // 加载 JD 并增加状态提示
 async function loadJDFile(file) {
   if (!file) return;
+  pendingToasts = [];
   const hint = document.getElementById('jdHint');
   const icon = document.getElementById('jdIcon');
   icon.textContent = '⏳';
   hint.textContent = '正在解析 JD 文件...';
 
-  // 强制浏览器渲染 Loading 状态
   await new Promise(r => setTimeout(r, 50));
 
   try {
@@ -259,10 +274,11 @@ async function loadJDFile(file) {
     icon.textContent = '📄';
     hint.textContent = '✅ 已加载:' + file.name;
   } catch(e) {
-    alert('JD文件解析失败:' + file.name);
+    showToast('❌ JD文件解析失败:' + file.name);
     icon.textContent = '📄';
     hint.textContent = '拖入 JD 文件至此或点击选择文件';
   }
+  pendingToasts.forEach(msg => showToast(msg));
 }
 
 // 拖拽事件监听 (JD)
@@ -278,6 +294,7 @@ resumeDrop.addEventListener('drop', e => { e.preventDefault(); resumeDrop.classL
 
 // 加载简历并增加状态提示
 async function handleResumeFiles(fileList) {
+  pendingToasts = [];
   const hint = document.getElementById('resumeHint');
   const icon = document.getElementById('resumeIcon');
   const originHint = hint.innerHTML;
@@ -288,24 +305,30 @@ async function handleResumeFiles(fileList) {
 
   // 去重：同名文件覆盖旧版本
   const existing = new Set(files.map(f => f.name));
+  let replaceCount = 0;
   for (const f of fileList) {
     if (existing.has(f.name)) {
-      alert('⚠️ ' + f.name + ' 已存在，已替换为新版本');
+      replaceCount++;
       files.splice(files.findIndex(x => x.name === f.name), 1);
-      continue;
     }
   }
+  if (replaceCount > 0) pendingToasts.push(`🔄 已自动覆盖 ${replaceCount} 份同名更新`);
 
   for (const f of fileList) {
     try {
       const text = await parseFile(f);
       const lines = text.split('\n').filter(l => l.trim());
-      // 优先用文件名提取姓名,第一行文字作备选
-      const fnName = f.name.replace(/[_\.].*/, '').replace(/^\d+[.\-_]?/, '').trim();
-      const name = fnName && fnName.length <= 10 ? fnName : (lines[0]?.replace(/[|｜\s\-:：—–].*$/, '').trim() || f.name.replace(/\.[^.]+$/, ''));
+      
+      // 优化后的姓名提取：去除后缀名和常见修饰词，最大程度保留原本名字
+      let fnName = f.name.replace(/\.[^.]+$/, '').replace(/[-_]?(的?简历|resume|cv|前端|后端|开发|工程师).*$/i, '').trim();
+      const name = fnName && fnName.length <= 15 ? fnName : (lines[0]?.replace(/[|｜\s\-:：—–].*$/, '').trim() || f.name.replace(/\.[^.]+$/, ''));
+      
       files.push({ name: f.name, candidateName: name, text: text.substring(0, 8000) });
+      
       // 扫描件/图片PDF检测
-      if (text.trim().length < 20) { alert('⚠️ ' + f.name + ' 可能为扫描件或图片PDF,无法提取文字。匹配度为 0%。'); }
+      if (text.trim().length > 0 && text.trim().length < 30) { 
+        pendingToasts.push(`⚠️ [${f.name}] 可能是图片/扫描件,无法提取文字`); 
+      }
     } catch(e) {
       files.push({ name: f.name, candidateName: f.name, text: '【解析失败】' });
     }
@@ -315,6 +338,9 @@ async function handleResumeFiles(fileList) {
   hint.innerHTML = originHint;
   document.getElementById('fileInput').value = '';
   updateFileList();
+  
+  // 批量展示所有的吐司提示，避免弹窗轰炸
+  pendingToasts.forEach((msg, idx) => setTimeout(() => showToast(msg), idx * 400));
 }
 
 function updateFileList() {
@@ -328,9 +354,6 @@ function removeFile(i) { files.splice(i, 1); updateFileList(); }
 /*
 =========================================
 🔥 关键词匹配:中文用 includes,英文用灵活正则
-   - 中文无 \b 边界 → includes() 精确匹配
-   - 英文短语(含空格/连字符)→ 支持 _ - 空格 三种分隔符
-   - 英文单词 → \b 边界匹配
 =========================================
 */
 const AI_KEYWORDS = [
@@ -343,13 +366,11 @@ const AI_KEYWORDS = [
 ];
 
 function buildFlexibleRegex(kw) {
-  // 如果包含空格或连字符,做成灵活匹配:[ _-]?
   if (/[\s\-]/.test(kw)) {
     const separated = kw.toLowerCase().split(/[\s\-]+/);
     const pattern = separated.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[\\s_\\-]?');
     return new RegExp(pattern, 'i');
   }
-  // 纯单词用 \b 边界
   return new RegExp('\\b' + kw.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
 }
 
@@ -362,33 +383,20 @@ function extractKeywords(text) {
     const lk = kw.toLowerCase();
     if (seen.has(lk)) continue;
 
-    // 纯英文关键词(含连字符或空格)→ 灵活正则
     if (/^[a-z0-9\-\s]+$/i.test(kw)) {
       const regex = buildFlexibleRegex(kw);
-      if (regex.test(text)) {
-        found.push(kw);
-        seen.add(lk);
-      }
+      if (regex.test(text)) { found.push(kw); seen.add(lk); }
     } else {
-      // 中文关键词 → includes()(中文无 \b 边界)
-      if (lowerText.includes(lk)) {
-        found.push(kw);
-        seen.add(lk);
-      }
+      if (lowerText.includes(lk)) { found.push(kw); seen.add(lk); }
     }
   }
   return found;
 }
 
-/*
-=========================================
-🔥 修复 2 & 新增:本地规则匹配 vs AI 深度匹配
-=========================================
-*/
 async function batchAnalyze() {
   const jd = document.getElementById('jd').value.trim();
-  if (!jd) { alert('请先填写或拖入职位描述(JD)'); return; }
-  if (files.length === 0) { alert('请先拖入简历文件'); return; }
+  if (!jd) { showToast('❌ 请先填写或拖入职位描述(JD)'); return; }
+  if (files.length === 0) { showToast('❌ 请先拖入简历文件'); return; }
 
   const useAI = document.getElementById('useAICheckbox').checked;
 
@@ -434,9 +442,8 @@ async function analyzeWithAI(jd) {
   const model = document.getElementById('aiModel').value;
   const apiKey = document.getElementById('aiKey').value;
 
-  if (!apiKey) { alert('请输入 API Key'); return; }
+  if (!apiKey) { showToast('❌ 请输入 API Key'); return; }
 
-  // 显示全局加载状态
   document.getElementById('resultCard').style.display = 'block';
   document.getElementById('resultTable').innerHTML = `
     <tr>
@@ -459,7 +466,7 @@ async function analyzeWithAI(jd) {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
         body: JSON.stringify({
           model: model,
-          response_format: { type: "json_object" }, // 强制要求 JSON 对象
+          response_format: { type: "json_object" }, 
           messages: [
             {
               role: "system",
@@ -499,9 +506,11 @@ async function analyzeWithAI(jd) {
       const data = await res.json();
       if (data.error) throw new Error(data.error.message);
 
-      let content = data.choices[0].message.content.trim();
-      // 容错处理:清理可能带有 markdown 代码块标记的响应
-      content = content.replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim();
+      // 安全地提取出JSON对象，无视AI的废话
+      let content = data.choices[0].message.content;
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) content = jsonMatch[0];
+      
       const result = JSON.parse(content);
 
       return {
@@ -517,7 +526,7 @@ async function analyzeWithAI(jd) {
       };
     } catch(e) {
       console.error("AI 匹配异常:", f.name, e);
-      return { name: f.candidateName, fileName: f.name, score: 0, matched: [], missing: [], reason: `API 调用失败: ${e.message}`, isAI: true };
+      return { name: f.candidateName, fileName: f.name, score: 0, matched: [], missing: [], reason: `API 解析失败: ${e.message}`, isAI: true };
     }
     });
     const batchResults = await Promise.all(batchPromises);
