@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>简历批量匹配 · 旗舰版</title>
+<title>简历批量匹配（AI岗位） · 旗舰版</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
 <style>
@@ -160,7 +160,7 @@ tr:hover td { background: #F8FAFC; }
   <div class="ai-toggle-box">
     <label class="switch-label">
       <input type="checkbox" id="useAICheckbox" onchange="toggleAI()">
-      🤖 启用 AI 大模型深度匹配（OpenAI 格式 API）
+      🤖 启用 AI 大模型深度匹配（OpenAI 格式 API）<br><span style="font-size:12px;color:#94a3b8;font-weight:normal;">⚠️ 使用第三方API存在数据泄漏风险，建议使用官方API（如DeepSeek官方api.deepseek.com）</span>
     </label>
     <div class="ai-settings" id="aiSettings">
       <div class="api-inputs">
@@ -215,10 +215,14 @@ async function parseFile(file) {
     const buf = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
     const pages = [];
-    for (let i = 1; i <= pdf.numPages; i++) {
+    const maxPages = 20;
+    for (let i = 1; i <= Math.min(pdf.numPages, maxPages); i++) {
       const page = await pdf.getPage(i);
       const content = await page.getTextContent();
       pages.push(content.items.map(it => it.str).join(' '));
+    }
+    if (pdf.numPages > maxPages) {
+      alert('📄 ' + file.name + ' 共 ' + pdf.numPages + ' 页，仅解析前 ' + maxPages + ' 页。大文件建议提取关键页后再上传。');
     }
     return pages.join('\n');
   } else if (file.name.endsWith('.doc')) {
@@ -282,7 +286,9 @@ async function handleResumeFiles(fileList) {
     try {
       const text = await parseFile(f);
       const lines = text.split('\n').filter(l => l.trim());
-      const name = lines[0]?.replace(/[|｜\s\-:：—–].*$/, '').trim() || f.name.replace(/\.[^.]+$/, '');
+      // 优先用文件名提取姓名，第一行文字作备选
+      const fnName = f.name.replace(/[_\.].*/, '').replace(/^\d+[.\-_]?/, '').trim();
+      const name = fnName && fnName.length <= 10 ? fnName : (lines[0]?.replace(/[|｜\s\-:：—–].*$/, '').trim() || f.name.replace(/\.[^.]+$/, ''));
       files.push({ name: f.name, candidateName: name, text: text.substring(0, 8000), raw: text });
     } catch(e) {
       files.push({ name: f.name, candidateName: f.name, text: '【解析失败】', raw: '' });
@@ -426,7 +432,7 @@ async function analyzeWithAI(jd) {
     </tr>
   `;
 
-  const batchSize = 3;
+  const batchSize = 5;
   const allResults = [];
   for (let i = 0; i < files.length; i += batchSize) {
     const batch = files.slice(i, i + batchSize);
