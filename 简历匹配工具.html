@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>批量简历匹配 · beiyu-notes</title>
+<title>简历批量匹配 · beiyu-notes</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,"Microsoft YaHei",sans-serif;background:#1a1a2e;color:#e0e0e0;min-height:100vh;display:flex}
@@ -18,8 +20,10 @@ textarea:focus{outline:none;border-color:#e94560}
 .btn{background:#e94560;color:#fff;border:none;padding:12px 32px;border-radius:8px;cursor:pointer;font-size:15px;font-weight:600;transition:background .2s}
 .btn:hover{background:#c73852}
 .btn:disabled{background:#444;cursor:not-allowed}
-.btn-sm{background:#0f3460;color:#e0e0e0;border:1px solid #333;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;margin:2px}
-.btn-sm.active{background:#e94560;border-color:#e94560}
+.drop-zone{border:2px dashed #444;border-radius:12px;padding:40px;text-align:center;color:#888;cursor:pointer;transition:all .3s;margin-bottom:12px}
+.drop-zone:hover,.drop-zone.drag{border-color:#e94560;background:rgba(233,69,96,.05);color:#e94560}
+.drop-zone .icon{font-size:40px;margin-bottom:8px}
+.drop-zone .hint{font-size:13px}
 table{width:100%;border-collapse:collapse;margin-top:12px}
 th{text-align:left;padding:10px 14px;font-size:12px;color:#888;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #333}
 td{padding:12px 14px;border-bottom:1px solid #1a1a2e;font-size:13px}
@@ -35,25 +39,28 @@ tr:hover{background:rgba(233,69,96,.05)}
 .detail-row.show{display:table-row}
 .detail-row td{background:#0a0a1a;padding:16px 24px;font-size:13px;line-height:1.8}
 .counter{color:#e94560;font-weight:600;font-size:24px}
-.input-row{display:flex;gap:8px;align-items:flex-start;margin-bottom:12px}
-.input-row textarea{min-height:80px;font-size:13px;flex:1}
+.file-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.file-chip{background:#0f3460;border-radius:8px;padding:6px 12px;font-size:12px;display:flex;align-items:center;gap:6px}
+.file-chip .remove{cursor:pointer;color:#e94560;margin-left:4px}
+.status{font-size:12px;margin-top:8px}
+.status.ok{color:#00d4aa}
+.status.err{color:#e94560}
 </style>
 </head>
 <body>
 <div class="sidebar">
   <h2>📋 批量简历匹配</h2>
-  <p>贴一次JD，多份简历批量对比，自动排名。</p>
-  <p style="margin-top:8px">所有计算在本地浏览器完成，不上传任何数据。</p>
-  <p style="margin-top:auto;padding-top:24px;color:#555;font-size:11px">beiyu-notes<br>江夜 & 北屿<br>2026.06</p>
+  <p>拖入PDF/Word简历文件，一次对比多份，自动排名。</p>
+  <p style="margin-top:8px">所有处理在浏览器本地完成，不上传任何数据。</p>
+  <p style="margin-top:auto;padding-top:24px;color:#555;font-size:11px">beiyu-notes<br>江夜 & 北屿 · 2026.06</p>
 </div>
 <div class="main">
   <div class="card">
     <h3>📌 怎么用</h3>
     <p style="color:#888;font-size:13px;line-height:2">
       1. 贴一份 <b>职位描述（JD）</b><br>
-      2. 贴多份 <b>候选人简历</b>——用 <b>---</b> 分隔（三个横杠在一行）<br>
-      3. 点 <b>「批量匹配」</b><br>
-      4. 看排名表——点击候选人名字展开详情
+      2. <b>拖入</b> 多份简历文件（PDF / Word / 纯文本）<br>
+      3. 点 <b>「批量匹配」</b>——自动排名
     </p>
   </div>
 
@@ -63,33 +70,95 @@ tr:hover{background:rgba(233,69,96,.05)}
   </div>
 
   <div class="card">
-    <h3>👥 候选人简历 <span style="color:#888;font-size:12px;font-weight:normal;">—— 用 --- 分隔多份</span></h3>
-    <textarea id="resumes" placeholder="粘贴多份简历，用 --- 分隔&#10;&#10;例如：&#10;张三 | 3年AI产品 | LangChain/RAG&#10;---&#10;李四 | 5年后端 | Python/Go/K8s&#10;---&#10;王五 | 2年AI策略 | Agent设计/prompt工程" style="min-height:240px"></textarea>
+    <h3>👥 简历文件 <span style="color:#888;font-size:12px;font-weight:normal">—— 拖拽或点击上传</span></h3>
+    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+      <div class="icon">📂</div>
+      <div class="hint">拖拽 PDF / Word / 文本文件到此处<br>或点击选择文件（可多选）</div>
+    </div>
+    <input type="file" id="fileInput" multiple accept=".pdf,.docx,.doc,.txt" style="display:none" onchange="handleFiles(this.files)">
+    <div class="file-list" id="fileList"></div>
+    <div class="status" id="fileStatus"></div>
   </div>
 
   <div style="text-align:center;margin:16px 0">
-    <button class="btn" onclick="batchAnalyze()" style="font-size:16px;padding:14px 48px">🔍 批量匹配 (<span id="resumeCount">0</span> 份简历)</button>
+    <button class="btn" id="analyzeBtn" onclick="batchAnalyze()" style="font-size:16px;padding:14px 48px">🔍 批量匹配 (<span id="resumeCount">0</span> 份简历)</button>
   </div>
 
   <div class="card" id="resultCard" style="display:none">
     <h3>📊 匹配排名</h3>
-    <table><thead><tr><th>排名</th><th>候选人</th><th>匹配度</th><th>操作</th></tr></thead><tbody id="resultTable"></tbody></table>
+    <table><thead><tr><th>排名</th><th>候选人</th><th>匹配度</th><th>文件名</th><th>操作</th></tr></thead><tbody id="resultTable"></tbody></table>
   </div>
 </div>
 
 <script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+const files = [];
+
+const dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag');
+  handleFiles(e.dataTransfer.files);
+});
+
+async function handleFiles(fileList) {
+  for (const f of fileList) {
+    try {
+      let text = '';
+      if (f.name.endsWith('.pdf')) {
+        const buf = await f.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+        const pages = [];
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const content = await page.getTextContent();
+          pages.push(content.items.map(it => it.str).join(' '));
+        }
+        text = pages.join('\n');
+      } else if (f.name.endsWith('.docx') || f.name.endsWith('.doc')) {
+        const buf = await f.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer: buf });
+        text = result.value;
+      } else {
+        text = await f.text();
+      }
+      // Extract name: first line, clean up
+      const lines = text.split('\n').filter(l => l.trim());
+      const name = lines[0]?.replace(/[|｜\s\-:：—–].*$/, '').trim() || f.name.replace(/\.[^.]+$/, '');
+      files.push({ name: f.name, candidateName: name, text: text.substring(0, 5000), raw: text });
+      updateFileList();
+    } catch (e) {
+      document.getElementById('fileStatus').innerHTML += `<div class="status err">❌ ${f.name}: 解析失败</div>`;
+    }
+  }
+  document.getElementById('fileInput').value = '';
+}
+document.getElementById('fileInput').addEventListener('change', function() { handleFiles(this.files); });
+
+function updateFileList() {
+  document.getElementById('fileList').innerHTML = files.map((f, i) =>
+    `<div class="file-chip">📄 ${f.name} <span style="color:#888">(${f.candidateName})</span><span class="remove" onclick="removeFile(${i})">✕</span></div>`
+  ).join('');
+  document.getElementById('resumeCount').textContent = files.length;
+  if (files.length > 0) document.getElementById('fileStatus').innerHTML = `<div class="status ok">✅ 已加载 ${files.length} 份简历</div>`;
+}
+
+function removeFile(i) { files.splice(i, 1); updateFileList(); }
+
 const AI_PATTERNS = [
-  /\b(AI|人工智能|agent|智能体|大模型|LLM|GPT|Claude|DeepSeek|通义|文心|豆包|Grok|Gemini|Copilot|Codex|Cursor)\b/gi,
-  /\b(skill|技能|prompt|提示词|RAG|检索增强|function.?call|工具调用|tool.?use|MCP|plugin|插件|API|微调|fine.?tun|embedding|向量|RLHF)\b/gi,
-  /\b(agentic|自主|规划|planning|reasoning|推理|chain.?of.?thought|思维链|multi.?agent|多智能体|orchestrat|编排|workflow|工作流|pipeline|全链路)\b/gi,
-  /\b(策略|strategy|end.?to.?end|产品|product|用户|user|体验|UX|交互|interaction|设计|design|数据|data|分析|analytics|指标|metric|AB|实验|增长)\b/gi,
-  /\b(Python|Java|TypeScript|React|Vue|Node|FastAPI|Flask|Docker|K8s|k8s|云原生|cloud|Git|Linux)\b/gi,
-  /\b(沟通|协作|团队|项目管理|需求|owner|ownership|自驱|迭代|优化|敏捷|scrum|跨部门)\b/gi,
+  /\b(AI|人工智能|agent|智能体|大模型|LLM|GPT|Claude|DeepSeek|通义|文心|豆包|Grok|Gemini|Copilot|Codex|Cursor|OpenAI|Anthropic)\b/gi,
+  /\b(skill|技能|prompt|提示词|RAG|检索增强|function.?call|工具调用|tool.?use|MCP|plugin|插件|API|微调|fine.?tun|embedding|向量|RLHF|SFT|对齐|alignment)\b/gi,
+  /\b(agentic|自主|规划|planning|reasoning|推理|chain.?of.?thought|思维链|multi.?agent|多智能体|orchestrat|编排|workflow|工作流|pipeline|全链路|端到端)\b/gi,
+  /\b(策略|strategy|产品|product|用户|user|体验|UX|交互|interaction|设计|design|数据|data|分析|analytics|指标|metric|AB|实验|增长|转化|留存)\b/gi,
+  /\b(Python|Java|TypeScript|React|Vue|Node|FastAPI|Flask|Docker|K8s|k8s|云原生|cloud|Git|Linux|SQL|MongoDB|Redis)\b/gi,
+  /\b(沟通|协作|团队|项目管理|需求|owner|ownership|自驱|迭代|优化|敏捷|scrum|跨部门|跨团队|落地|上线)\b/gi,
 ];
 
 function extractKeywords(text) {
-  const found = [];
-  const seen = new Set();
+  const found = []; const seen = new Set();
   for (const p of AI_PATTERNS) {
     let m;
     while ((m = p.exec(text)) !== null) {
@@ -100,51 +169,41 @@ function extractKeywords(text) {
   return found;
 }
 
-function matchScore(jdKw, resumeKw) {
-  const jdSet = new Set(jdKw);
-  const resumeSet = new Set(resumeKw);
-  let matched = [], missing = [];
-
-  for (const kw of jdKw) {
-    let found = false;
-    for (const rk of resumeKw) {
-      if (kw === rk || kw.includes(rk) || rk.includes(kw)) { matched.push(kw); found = true; break; }
-    }
-    if (!found) missing.push(kw);
-  }
-
-  const total = jdKw.length || 1;
-  const overlap = [...jdSet].filter(k => resumeSet.has(k)).length;
-  const overlapBonus = (overlap / Math.max(jdSet.size, 1)) * 0.3;
-  const score = Math.min(100, Math.round((matched.length / total) * 70 + overlapBonus * 100));
-  return { score, matched: [...new Set(matched)], missing };
-}
-
-function updateCount() {
-  const text = document.getElementById('resumes').value.trim();
-  const count = text ? text.split('\n---\n').filter(s => s.trim()).length : 0;
-  document.getElementById('resumeCount').textContent = count;
-}
-document.getElementById('resumes').addEventListener('input', updateCount);
-
 function batchAnalyze() {
   const jd = document.getElementById('jd').value.trim();
-  const resumesText = document.getElementById('resumes').value.trim();
-  if (!jd || !resumesText) { alert('请填写JD和至少一份简历'); return; }
-
-  const parts = resumesText.split('\n---\n').filter(s => s.trim());
-  if (parts.length === 0) { alert('未检测到简历，请用 --- 分隔多份简历'); return; }
+  if (!jd) { alert('请先粘贴职位描述（JD）'); return; }
+  if (files.length === 0) { alert('请先上传简历文件'); return; }
 
   const jdKw = extractKeywords(jd);
   const results = [];
 
-  for (let i = 0; i < parts.length; i++) {
-    const resume = parts[i].trim();
-    const lines = resume.split('\n');
-    const name = lines[0]?.replace(/[|｜\s\-:：].*$/, '').trim() || ('候选人 ' + (i+1));
-    const resumeKw = extractKeywords(resume);
-    const { score, matched, missing } = matchScore(jdKw, resumeKw);
-    results.push({ name, score, matched, missing, resume, i: i+1 });
+  for (const f of files) {
+    const resumeKw = extractKeywords(f.text);
+    const jdSet = new Set(jdKw);
+    const resumeSet = new Set(resumeKw);
+    let matched = [], missing = [];
+
+    for (const kw of jdKw) {
+      let found = false;
+      for (const rk of resumeKw) {
+        if (kw === rk || kw.includes(rk) || rk.includes(kw)) { matched.push(kw); found = true; break; }
+      }
+      if (!found) missing.push(kw);
+    }
+
+    const total = jdKw.length || 1;
+    const overlap = [...jdSet].filter(k => resumeSet.has(k)).length;
+    const overlapBonus = (overlap / Math.max(jdSet.size, 1)) * 0.3;
+    const score = Math.min(100, Math.round((matched.length / total) * 70 + overlapBonus * 100));
+
+    matched = [...new Set(matched)];
+    missing = [...new Set(missing)];
+
+    results.push({
+      name: f.candidateName, fileName: f.name, score,
+      matched, missing,
+      brief: f.text.substring(0, 300).replace(/\n/g, ' ')
+    });
   }
 
   results.sort((a, b) => b.score - a.score);
@@ -155,15 +214,16 @@ function batchAnalyze() {
     const status = r.score >= 70 ? '✅ 推荐' : r.score >= 40 ? '⚠️ 待定' : '❌ 不推荐';
     html += `<tr>
       <td><span class="counter">${idx+1}</span></td>
-      <td><a href="javascript:void(0)" onclick="toggleDetail(${r.i})" style="color:#e0e0e0;text-decoration:none;font-weight:600">${r.name}</a><br><small style="color:#888">${status}</small></td>
+      <td><a href="javascript:void(0)" onclick="toggleDetail('d${idx}')" style="color:#e0e0e0;text-decoration:none;font-weight:600">${r.name}</a><br><small style="color:#888">${status}</small></td>
       <td><span class="score-dot ${dotClass}"></span><strong>${r.score}%</strong></td>
-      <td><button class="btn-sm" onclick="toggleDetail(${r.i})">详情</button></td>
+      <td style="color:#888;font-size:12px">${r.fileName}</td>
+      <td><button class="btn-sm" onclick="toggleDetail('d${idx}')" style="font-size:12px">展开</button></td>
     </tr>
-    <tr class="detail-row" id="detail-${r.i}">
-      <td colspan="4">
-        <div style="margin:4px 0"><strong>简历摘要：</strong>${r.resume.substring(0,200).replace(/\n/g,'<br>')}...</div>
-        <div style="margin:8px 0"><strong style="color:#00d4aa">✅ JD要求且有：</strong>${r.matched.length ? r.matched.slice(0,15).map(k=>'<span class="tag match">'+k+'</span>').join(' ') : '（无直接匹配，建议查看实际项目经验）'}</div>
-        <div style="margin:8px 0"><strong style="color:#888">❌ JD要求但缺失：</strong>${r.missing.length ? r.missing.slice(0,10).map(k=>'<span class="tag missing">'+k+'</span>').join(' ') + (r.missing.length>10?' ...等'+r.missing.length+'项':'') : '（完全覆盖）'}</div>
+    <tr class="detail-row" id="d${idx}">
+      <td colspan="5">
+        <div style="margin:4px 0"><strong>前300字：</strong><br><span style="color:#aaa;font-size:12px">${r.brief}...</span></div>
+        <div style="margin:8px 0"><strong style="color:#00d4aa">✅ 匹配 (${r.matched.length})：</strong>${r.matched.length ? r.matched.slice(0,15).map(k=>'<span class="tag match">'+k+'</span>').join(' ') : '（无直接关键词匹配）'}</div>
+        <div style="margin:8px 0"><strong style="color:#888">❌ 缺失 (${r.missing.length})：</strong>${r.missing.length ? r.missing.slice(0,10).map(k=>'<span class="tag missing">'+k+'</span>').join(' ') + (r.missing.length>10?' ...等'+r.missing.length+'项':'') : '（完全覆盖）'}</div>
         <div style="margin:8px 0;color:#888;font-size:12px">💡 关键词匹配仅供参考——候选人可能用不同表述描述相同能力。</div>
       </td>
     </tr>`;
@@ -173,8 +233,8 @@ function batchAnalyze() {
   document.getElementById('resultCard').style.display = 'block';
 }
 
-function toggleDetail(i) {
-  const row = document.getElementById('detail-' + i);
+function toggleDetail(id) {
+  const row = document.getElementById(id);
   if (row) row.classList.toggle('show');
 }
 </script>
