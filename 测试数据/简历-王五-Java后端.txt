@@ -1,0 +1,15 @@
+王五 | 3年Java后端 | 求职：Java开发工程师
+
+【工作经历】
+某金融科技公司 | Java开发工程师 | 2022-至今
+- 负责支付系统后端微服务开发，使用Spring Boot、MyBatis
+- 设计数据库表结构，优化SQL查询性能
+- Docker容器化部署，K8s编排管理
+- 参与需求评审，与产品、前端协作完成需求落地
+
+某外包公司 | Java开发 | 2020-2022
+- 负责银行内部管理系统开发
+- 使用Git进行版本管理，熟悉Linux环境部署
+
+【技能】
+Java、Spring Boot、MySQL、Redis、Docker、K8s、Git、Linux
