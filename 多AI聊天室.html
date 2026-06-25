@@ -1,0 +1,1863 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 多人聊天室</title>
+    <style>
+        :root {
+            --bg: #1a1a2e;
+            --surface: #16213e;
+            --surface2: #0f3460;
+            --text: #e0e0e0;
+            --text2: #a0a0b8;
+            --accent: #7c5cfc;
+            --accent2: #5c7cfc;
+            --danger: #e74c3c;
+            --success: #2ecc71;
+            --warning: #f39c12;
+            --border: #2a2a4a;
+            --msg-user: #2d1b69;
+            --msg-ai: #1a2740;
+            --scrollbar: #3a3a5a;
+            --radius: 12px;
+            --radius-sm: 8px;
+            --shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+            --transition: 0.2s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* ========== 侧边栏 ========== */
+        .sidebar {
+            width: 420px;
+            min-width: 420px;
+            height: 100vh;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            z-index: 10;
+            transition: transform var(--transition);
+            box-shadow: var(--shadow);
+        }
+        .sidebar.collapsed {
+            transform: translateX(-420px);
+            min-width: 0;
+            width: 0;
+        }
+
+        .sidebar-header {
+            padding: 16px 18px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .sidebar-header h2 {
+            font-size: 1.1em;
+            font-weight: 700;
+            white-space: nowrap;
+            letter-spacing: 0.5px;
+            background: linear-gradient(135deg, #b388ff, #7c5cfc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .btn-icon {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            color: var(--text);
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            font-size: 0.85em;
+            transition: all var(--transition);
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .btn-icon:hover {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+        }
+        .btn-icon.danger:hover {
+            background: var(--danger);
+            border-color: var(--danger);
+        }
+        .btn-icon.success:hover {
+            background: var(--success);
+            border-color: var(--success);
+        }
+
+        .sidebar-scroll {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .sidebar-scroll::-webkit-scrollbar {
+            width: 5px;
+        }
+        .sidebar-scroll::-webkit-scrollbar-thumb {
+            background: var(--scrollbar);
+            border-radius: 10px;
+        }
+
+        /* AI配置卡片 */
+        .ai-card {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 14px;
+            transition: all var(--transition);
+            position: relative;
+        }
+        .ai-card.expanded {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(124, 92, 252, 0.15);
+        }
+        .ai-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            gap: 8px;
+        }
+        .ai-card-header .ai-name-display {
+            font-weight: 700;
+            font-size: 1em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .ai-avatar-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            flex-shrink: 0;
+        }
+        .ai-card-header .badge {
+            font-size: 0.7em;
+            padding: 3px 8px;
+            border-radius: 20px;
+            background: var(--accent);
+            color: #fff;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .ai-card-body {
+            display: none;
+            margin-top: 12px;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .ai-card.expanded .ai-card-body {
+            display: flex;
+        }
+        .ai-card-body label {
+            font-size: 0.78em;
+            color: var(--text2);
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .ai-card-body input[type="text"],
+        .ai-card-body input[type="password"],
+        .ai-card-body input[type="url"],
+        .ai-card-body input[type="number"],
+        .ai-card-body textarea {
+            width: 100%;
+            padding: 9px 11px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            font-size: 0.85em;
+            font-family: inherit;
+            transition: border var(--transition);
+            resize: vertical;
+        }
+        .ai-card-body input:focus,
+        .ai-card-body textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(124, 92, 252, 0.1);
+        }
+        .ai-card-body textarea {
+            min-height: 70px;
+            resize: vertical;
+        }
+        .ai-card-body .row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .ai-card-body .row>* {
+            flex: 1;
+        }
+        .ai-card-body .row label {
+            flex: none;
+            white-space: nowrap;
+            min-width: 50px;
+        }
+        .ai-card-body input[type="range"] {
+            flex: 1;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+        .ai-card-body .range-val {
+            font-weight: 700;
+            font-size: 0.85em;
+            min-width: 36px;
+            text-align: center;
+            color: var(--accent);
+        }
+        .btn-sm {
+            padding: 7px 14px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            background: var(--surface2);
+            color: var(--text);
+            cursor: pointer;
+            font-size: 0.8em;
+            transition: all var(--transition);
+            font-weight: 600;
+        }
+        .btn-sm:hover {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+        }
+        .btn-sm.danger {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+        .btn-sm.danger:hover {
+            background: var(--danger);
+            color: #fff;
+        }
+        .btn-add-ai {
+            width: 100%;
+            padding: 12px;
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            background: transparent;
+            color: var(--text2);
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: 600;
+            transition: all var(--transition);
+            letter-spacing: 0.5px;
+        }
+        .btn-add-ai:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: rgba(124, 92, 252, 0.05);
+        }
+
+        .sidebar-footer {
+            padding: 10px 14px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        /* ========== 主聊天区 ========== */
+        .main-area {
+            flex: 1;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            position: relative;
+        }
+        .chat-header {
+            padding: 12px 18px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--surface);
+            z-index: 5;
+        }
+        .chat-header .toggle-sidebar {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            color: var(--text);
+            cursor: pointer;
+            padding: 8px 10px;
+            border-radius: var(--radius-sm);
+            font-size: 1.1em;
+            transition: all var(--transition);
+            line-height: 1;
+        }
+        .chat-header .toggle-sidebar:hover {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+        .chat-header .ai-indicators {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .ai-indicator {
+            font-size: 0.75em;
+            padding: 4px 10px;
+            border-radius: 20px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-weight: 600;
+            transition: all var(--transition);
+        }
+        .ai-indicator .dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .ai-indicator.loading-dot {
+            animation: pulse-dot 1s infinite;
+        }
+        @keyframes pulse-dot {
+            0%,
+            100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.3;
+            }
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            scroll-behavior: smooth;
+        }
+        .chat-messages::-webkit-scrollbar {
+            width: 6px;
+        }
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: var(--scrollbar);
+            border-radius: 10px;
+        }
+
+        .msg {
+            display: flex;
+            gap: 10px;
+            max-width: 85%;
+            animation: fadeInUp 0.25s ease;
+        }
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .msg.user {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+        .msg.ai {
+            align-self: flex-start;
+        }
+        .msg.system-msg {
+            align-self: center;
+            max-width: 95%;
+            font-size: 0.78em;
+            color: var(--text2);
+            background: transparent;
+            border: 1px dashed var(--border);
+            padding: 6px 14px;
+            border-radius: 20px;
+            text-align: center;
+        }
+        .msg-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.85em;
+            flex-shrink: 0;
+            color: #fff;
+        }
+        .msg.user .msg-avatar {
+            background: #7c5cfc;
+        }
+        .msg-bubble {
+            padding: 10px 14px;
+            border-radius: var(--radius);
+            line-height: 1.55;
+            font-size: 0.9em;
+            word-break: break-word;
+            white-space: pre-wrap;
+            position: relative;
+        }
+        .msg.user .msg-bubble {
+            background: var(--msg-user);
+            border-bottom-right-radius: 4px;
+        }
+        .msg.ai .msg-bubble {
+            background: var(--msg-ai);
+            border: 1px solid var(--border);
+            border-bottom-left-radius: 4px;
+        }
+        .msg-bubble .sender-name {
+            font-size: 0.75em;
+            font-weight: 700;
+            margin-bottom: 4px;
+            opacity: 0.85;
+            letter-spacing: 0.3px;
+        }
+        .msg-bubble .time-stamp {
+            font-size: 0.7em;
+            color: var(--text2);
+            margin-top: 4px;
+            text-align: right;
+        }
+/* 消息操作按钮（编辑/删除/重新生成） */
+.msg-action-btn {
+  cursor: pointer;
+  font-size: 0.8em;
+  opacity: 0.5;
+  padding: 2px 4px;
+  transition: all 0.2s ease;
+  display: inline-block;
+}
+.msg-action-btn:hover {
+  opacity: 1 !important;
+}
+/* 不同按钮的悬停颜色 */
+.edit-btn:hover {
+  color: #f39c12;
+}
+.delete-btn:hover {
+  color: #ff6b6b;
+}
+.regenerate-btn:hover {
+  color: #7c5cfc;
+}
+        .msg-bubble code {
+            background: rgba(0, 0, 0, 0.35);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.88em;
+            font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+        }
+        .msg-bubble pre {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 10px;
+            border-radius: var(--radius-sm);
+            overflow-x: auto;
+            margin: 6px 0;
+            font-size: 0.82em;
+        }
+
+        .typing-indicator {
+            align-self: flex-start;
+            display: flex;
+            gap: 10px;
+            padding: 6px 14px;
+        }
+        .typing-dots {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+        .typing-dots span {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--text2);
+            animation: typingBounce 1.2s infinite;
+        }
+        .typing-dots span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .typing-dots span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        @keyframes typingBounce {
+            0%,
+            60%,
+            100% {
+                transform: translateY(0);
+                opacity: 0.4;
+            }
+            30% {
+                transform: translateY(-8px);
+                opacity: 1;
+            }
+        }
+
+        .chat-input-area {
+            padding: 12px 18px;
+            border-top: 1px solid var(--border);
+            background: var(--surface);
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+        .chat-input-area textarea {
+            flex: 1;
+            padding: 10px 14px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            font-size: 0.9em;
+            font-family: inherit;
+            resize: none;
+            min-height: 44px;
+            max-height: 150px;
+            line-height: 1.5;
+            transition: border var(--transition);
+        }
+        .chat-input-area textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(124, 92, 252, 0.1);
+        }
+        .ai-mention-buttons {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            align-items: center;
+            padding-bottom: 6px;
+            flex-basis: 100%;   /* ← 加这一行，强制换行 */
+            order: -1;          /* ← 可选，确保按钮总是在最上面 */
+        }
+            .ai-mention-btn {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            white-space: nowrap;
+            }
+            .ai-mention-btn:hover {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+            }
+            .ai-mention-btn .dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            display: inline-block;
+            }
+        .btn-send {
+            padding: 10px 20px;
+            border-radius: var(--radius);
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 0.9em;
+            transition: all var(--transition);
+            white-space: nowrap;
+            letter-spacing: 0.5px;
+        }
+        .btn-send:hover {
+            background: #6a48e0;
+            box-shadow: 0 4px 16px rgba(124, 92, 252, 0.4);
+            transform: translateY(-1px);
+        }
+        .btn-send:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* ========== Toast ========== */
+        .toast-container {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            z-index: 999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            pointer-events: none;
+        }
+        .toast {
+            padding: 10px 16px;
+            border-radius: var(--radius-sm);
+            font-size: 0.85em;
+            font-weight: 600;
+            animation: slideIn 0.3s ease;
+            pointer-events: auto;
+            box-shadow: var(--shadow);
+            max-width: 380px;
+            word-break: break-word;
+        }
+        .toast.info {
+            background: var(--accent2);
+            color: #fff;
+        }
+        .toast.warn {
+            background: var(--warning);
+            color: #000;
+        }
+        .toast.error {
+            background: var(--danger);
+            color: #fff;
+        }
+        @keyframes slideIn {
+            from {
+                transform: translateX(120%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* ========== 响应式 ========== */
+        @media (max-width: 900px) {
+            .sidebar {
+                position: fixed;
+                left: 0;
+                top: 0;
+                height: 100vh;
+                z-index: 50;
+                width: 380px;
+                min-width: 380px;
+                transform: translateX(-100%);
+            }
+            .sidebar.mobile-open {
+                transform: translateX(0);
+            }
+            .sidebar-overlay {
+                display: none;
+                position: fixed;
+                inset: 0;
+                background: rgba(0, 0, 0, 0.6);
+                z-index: 45;
+            }
+            .sidebar-overlay.active {
+                display: block;
+            }
+            .msg {
+                max-width: 92%;
+            }
+        }
+        @media (max-width: 500px) {
+            .sidebar {
+                width: 100vw;
+                min-width: 100vw;
+            }
+            .chat-messages {
+                padding: 10px 8px;
+                gap: 6px;
+            }
+            .msg {
+                max-width: 95%;
+            }
+            .msg-bubble {
+                font-size: 0.82em;
+                padding: 8px 10px;
+            }
+            .chat-input-area {
+                padding: 8px 10px;
+                gap: 6px;
+            }
+            .btn-send {
+                padding: 8px 14px;
+                font-size: 0.8em;
+            }
+        }
+        /* ------ 消息操作按钮悬停效果 ------ */
+        .regenerate-btn:hover,
+        .edit-btn:hover,
+        .delete-btn:hover {
+        opacity: 1 !important;
+        }
+        .regenerate-btn:hover {
+        color: #7c5cfc;
+        }
+        .edit-btn:hover {
+        color: #f39c12;
+        }
+        .delete-btn:hover {
+        color: #ff6b6b;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 侧边栏遮罩(移动端) -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- ========== 侧边栏：AI配置 ========== -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h2>🤖 AI 配置面板</h2>
+            <button class="btn-icon" onclick="toggleAllCards()" title="展开/折叠全部">📋 全部折叠</button>
+        </div>
+        <div class="sidebar-scroll" id="aiConfigList">
+            <!-- AI配置卡片动态生成 -->
+        </div>
+        <button class="btn-add-ai" id="btnAddAi" onclick="addAi()">＋ 添加 AI 助手</button>
+        <div class="sidebar-footer">
+            <button class="btn-icon success" onclick="exportConfig()">📥 导出配置</button>
+            <button class="btn-icon" onclick="importConfigPrompt()">📤 导入配置</button>
+            <button class="btn-icon danger" onclick="clearAllMessages()">🗑 清空聊天</button>
+            <button class="btn-icon" onclick="resetAllConfig()">🔄 重置全部</button>
+        </div>
+    </aside>
+
+    <!-- ========== 主聊天区 ========== -->
+    <div class="main-area">
+        <div class="chat-header">
+            <button class="toggle-sidebar" id="btnToggleSidebar" onclick="toggleSidebar()" title="切换配置面板">☰</button>
+            <span style="font-weight:700;font-size:1em;">💬 AI 聊天室</span>
+            <div style="display:flex; align-items:center; gap:6px; margin-left:12px;">
+                <label style="font-size:0.8em; color:var(--text2); white-space:nowrap;">👤 你的名字：</label>
+                <input type="text" id="userNameInput" 
+                        style="background:var(--bg); border:1px solid var(--border); border-radius:var(--radius-sm); padding:4px 8px; color:var(--text); font-size:0.8em; width:100px;" 
+                        placeholder="我"
+                        onchange="updateUserName(this.value)">
+            </div>
+            <span style="font-size:0.75em;color:var(--text2);">|</span>
+            <div class="ai-indicators" id="aiIndicators">
+                <span style="font-size:0.75em;color:var(--text2);">暂无AI配置</span>
+            </div>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+            <div class="msg system-msg">👋 欢迎来到 AI 聊天室！请先在左侧配置 AI 助手，然后开始对话。<br>💡 提示：在消息中使用 <b>@AI名字</b> 可以点名特定AI回复。</div>
+        </div>
+        <div class="chat-input-area">
+            <div class="ai-mention-buttons" id="aiMentionButtons"></div>
+            <textarea id="userInput" rows="1" placeholder="输入消息... (Enter发送，Shift+Enter换行，@AI名字点名)" onkeydown="handleInputKey(event)"></textarea>
+            <button class="btn-send" id="btnSend" onclick="sendMessage()">发送 ✈</button>
+        </div>
+    </div>
+
+    <!-- Toast容器 -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        (function() {
+            // ==================== 常量 ====================
+            const STORAGE_KEY_AI = 'ai_chatroom_ais_v2';
+            const STORAGE_KEY_MSGS = 'ai_chatroom_messages_v2';
+            const AI_COLORS = [
+                '#ff6b6b', '#ffa94d', '#ffd43b', '#69db7c', '#4dabf7',
+                '#748ffc', '#da77f2', '#f783ac', '#38d9a9', '#e599f7',
+                '#63e6be', '#ff8787', '#74c0fc', '#b197fc', '#fcc419'
+            ];
+
+            // ==================== 状态 ====================
+            let ais = []; // { id, name, apiKey, baseUrl, model, prompt, maxRounds, summaryRounds, normalProb, mentionProb, memory, color, expanded }
+            let messages = []; // { id, role:'user'|'ai', aiId?, aiName?, content, timestamp }
+            let loadingAiIds = new Set(); // 正在回复的AI的id集合
+            let isSending = false;
+            let userName = '我'; // 默认值
+            const USER_NAME_KEY = 'ai_chatroom_username';
+
+            // ==================== 工具函数 ====================
+            function genId() { return 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8); }
+
+            function now() { return new Date().toISOString(); }
+
+            function fmtTime(iso) {
+                const d = new Date(iso);
+                return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+            }
+
+            function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+            function toast(msg, type = 'info') {
+                const container = document.getElementById('toastContainer');
+                const el = document.createElement('div');
+                el.className = `toast ${type}`;
+                el.textContent = msg;
+                container.appendChild(el);
+                setTimeout(() => { el.style.opacity = '0';
+                    el.style.transition = 'opacity 0.3s';
+                    setTimeout(() => el.remove(), 350); }, 2800);
+            }
+
+            // ==================== 持久化 ====================
+            function saveAis() {
+                const toSave = ais.map(a => ({
+                    id: a.id,
+                    name: a.name,
+                    apiKey: a.apiKey,
+                    baseUrl: a.baseUrl,
+                    model: a.model,
+                    prompt: a.prompt,
+                    maxRounds: a.maxRounds,
+                    summaryRounds: a.summaryRounds,
+                    normalProb: a.normalProb,
+                    mentionProb: a.mentionProb,
+                    memory: a.memory,
+                    color: a.color,
+                    expanded: a.expanded,
+                }));
+                localStorage.setItem(STORAGE_KEY_AI, JSON.stringify(toSave));
+            }
+
+            function updateUserName(name) {
+            userName = name.trim() || '我';
+            localStorage.setItem(USER_NAME_KEY, userName);
+            }
+            function loadUserName() {
+            const saved = localStorage.getItem(USER_NAME_KEY);
+            if (saved) userName = saved;
+            }
+            function loadAis() {
+                const raw = localStorage.getItem(STORAGE_KEY_AI);
+                if (raw) {
+                    try {
+                        const parsed = JSON.parse(raw);
+                        ais = parsed.map((a, i) => ({
+                            ...a,
+                            id: a.id || genId(),
+                            color: a.color || AI_COLORS[i % AI_COLORS.length],
+                            expanded: a.expanded !== false,
+                            memory: a.memory || '',
+                            maxRounds: a.maxRounds || 20,
+                            summaryRounds: a.summaryRounds || 15,
+                            normalProb: a.normalProb ?? 0.3,
+                            mentionProb: a.mentionProb ?? 0.9,
+                            model: a.model || 'gpt-4o',
+                            baseUrl: a.baseUrl || 'https://api.openai.com/v1',
+                            lastSummaryRounds: a.lastSummaryRounds || 0,   // ← 兼容旧数据
+                        }));
+                    } catch (e) {
+                        ais = [];
+                    }
+                }
+                if (ais.length === 0) {
+                    // 默认创建2个AI
+                    ais.push(createDefaultAi(0, '小智', '#ff6b6b'));
+                    ais.push(createDefaultAi(1, '小雅', '#4dabf7'));
+                }
+            }
+
+            function createDefaultAi(index, name, color) {
+                return {
+                    id: genId(),
+                    name,
+                    apiKey: '',
+                    baseUrl: 'https://api.openai.com/v1',
+                    model: 'gpt-4o',
+                    prompt: `你是${name}，一个友好、博学的AI助手。请用中文回复，语气自然亲切。`,
+                    maxRounds: 20,
+                    summaryRounds: 14,
+                    normalProb: 0.35,
+                    mentionProb: 0.9,
+                    memory: '',
+                    color,
+                    expanded: true,
+                    lastSummaryRounds: 0,   // ← 新加字段，记录已总结过的轮数
+                };
+            }
+
+            function saveMessages() {
+                const toSave = messages.slice(-500); // 最多保存500条
+                localStorage.setItem(STORAGE_KEY_MSGS, JSON.stringify(toSave));
+            }
+
+            function loadMessages() {
+                const raw = localStorage.getItem(STORAGE_KEY_MSGS);
+                if (raw) {
+                    try {
+                        messages = JSON.parse(raw);
+                    } catch (e) {
+                        messages = [];
+                    }
+                }
+            }
+
+            // ==================== AI配置操作 ====================
+            function addAi() {
+                const idx = ais.length;
+                const color = AI_COLORS[idx % AI_COLORS.length];
+                const newAi = {
+                    id: genId(),
+                    name: `AI-${idx + 1}`,
+                    apiKey: '',
+                    baseUrl: 'https://api.openai.com/v1',
+                    model: 'gpt-4o',
+                    prompt: `你是AI助手，请用中文回复。`,
+                    maxRounds: 20,
+                    summaryRounds: 14,
+                    normalProb: 0.35,
+                    mentionProb: 0.9,
+                    memory: '',
+                    color,
+                    expanded: true,
+                };
+                ais.push(newAi);
+                saveAis();
+                renderAll();
+                toast(`已添加 ${newAi.name}`, 'info');
+            }
+
+            function removeAi(aiId) {
+                if (ais.length <= 1) {
+                    toast('至少保留一个AI', 'warn');
+                    return;
+                }
+                const ai = ais.find(a => a.id === aiId);
+                if (ai && !confirm(`确定删除 "${ai.name}" 吗？此操作不可恢复。`)) return;
+                ais = ais.filter(a => a.id !== aiId);
+                saveAis();
+                renderAll();
+                if (ai) toast(`已删除 ${ai.name}`, 'info');
+            }
+
+            function updateAiField(aiId, field, value) {
+                const ai = ais.find(a => a.id === aiId);
+                if (!ai) return;
+                if (field === 'normalProb' || field === 'mentionProb') {
+                    value = clamp(parseFloat(value), 0, 1);
+                }
+                if (field === 'maxRounds' || field === 'summaryRounds') {
+                    value = Math.max(2, parseInt(value) || 2);
+                }
+                ai[field] = value;
+                saveAis();
+                // 实时更新指示器
+                updateAiIndicators();
+            }
+
+            function toggleAiCard(aiId) {
+                const ai = ais.find(a => a.id === aiId);
+                if (!ai) return;
+                ai.expanded = !ai.expanded;
+                saveAis();
+                renderAiCards();
+            }
+
+            function toggleAllCards() {
+                const allExpanded = ais.every(a => a.expanded);
+                ais.forEach(a => a.expanded = !allExpanded);
+                saveAis();
+                renderAiCards();
+                const btn = document.querySelector('.sidebar-header .btn-icon');
+                if (btn) btn.textContent = allExpanded ? '📋 全部展开' : '📋 全部折叠';
+            }
+
+            // ==================== 渲染 ====================
+            function renderAll() {
+                renderAiCards();
+                renderMessages();
+                renderMentionButtons(); 
+                updateAiIndicators();
+            }
+
+            function renderAiCards() {
+                const container = document.getElementById('aiConfigList');
+                container.innerHTML = ais.map(ai => {
+                    const expClass = ai.expanded ? 'expanded' : '';
+                    return `
+                <div class="ai-card ${expClass}" id="aiCard_${ai.id}">
+                  <div class="ai-card-header" onclick="toggleAiCard('${ai.id}')">
+                    <span class="ai-name-display">
+                      <span class="ai-avatar-dot" style="background:${ai.color};"></span>
+                      ${escHtml(ai.name)}
+                    </span>
+                    <span style="display:flex;align-items:center;gap:6px;">
+                      <span class="badge" style="background:${ai.color};font-size:0.7em;">${ai.model}</span>
+                      <span style="font-size:0.7em;color:var(--text2);">${ai.expanded ? '▼' : '▶'}</span>
+                    </span>
+                  </div>
+                  <div class="ai-card-body">
+                    <label>🤖 名字</label>
+                    <input type="text" value="${escHtml(ai.name)}" onchange="updateAiField('${ai.id}','name',this.value);renderAll();" placeholder="AI的名字">
+                    <label>🔑 API Key</label>
+                    <input type="password" value="${escHtml(ai.apiKey)}" onchange="updateAiField('${ai.id}','apiKey',this.value)" placeholder="sk-...">
+                    <label>🌐 Base URL</label>
+                    <input type="url" value="${escHtml(ai.baseUrl)}" onchange="updateAiField('${ai.id}','baseUrl',this.value)" placeholder="https://api.openai.com/v1">
+                    <label>🧠 模型</label>
+                    <input type="text" value="${escHtml(ai.model)}" onchange="updateAiField('${ai.id}','model',this.value)" placeholder="gpt-4o / gpt-3.5-turbo / claude-3-opus...">
+                    <label>📝 系统 Prompt</label>
+                    <textarea onchange="updateAiField('${ai.id}','prompt',this.value)" placeholder="设定AI的角色和行为...">${escHtml(ai.prompt)}</textarea>
+                    <div class="row">
+                      <label>📐 最大上下文轮数</label>
+                      <input type="number" value="${ai.maxRounds}" min="2" max="100" onchange="updateAiField('${ai.id}','maxRounds',this.value);renderAiCards();">
+                    </div>
+                    <div class="row">
+                      <label>📝 总结触发轮数</label>
+                      <input type="number" value="${ai.summaryRounds}" min="2" max="100" onchange="updateAiField('${ai.id}','summaryRounds',this.value);renderAiCards();">
+                    </div>
+                    <div class="row">
+                      <label>🎲 普通回复概率</label>
+                      <input type="range" min="0" max="1" step="0.05" value="${ai.normalProb}" oninput="updateAiField('${ai.id}','normalProb',this.value);this.nextElementSibling.textContent=Math.round(this.value*100)+'%';">
+                      <span class="range-val">${Math.round(ai.normalProb * 100)}%</span>
+                    </div>
+                    <div class="row">
+                      <label>🎯 被点名回复概率</label>
+                      <input type="range" min="0" max="1" step="0.05" value="${ai.mentionProb}" oninput="updateAiField('${ai.id}','mentionProb',this.value);this.nextElementSibling.textContent=Math.round(this.value*100)+'%';">
+                      <span class="range-val">${Math.round(ai.mentionProb * 100)}%</span>
+                    </div>
+<div style="margin-top:4px;">
+  <label style="font-size:0.78em;color:var(--text2);">📌 记忆摘要（可编辑）</label>
+  <textarea 
+    style="width:100%; min-height:60px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:6px 10px; font-size:0.78em; resize:vertical;"
+    onchange="updateAiField('${ai.id}','memory',this.value);"
+    placeholder="无记忆"
+  >${escHtml(ai.memory || '')}</textarea>
+</div>
+                    <button class="btn-sm danger" onclick="removeAi('${ai.id}')">🗑 删除此AI</button>
+                  </div>
+                </div>`;
+                }).join('');
+                renderMentionButtons();
+            }
+
+            // 渲染艾特按钮列表
+function renderMentionButtons() {
+  const container = document.getElementById('aiMentionButtons');
+  if (!container) return;
+  container.innerHTML = ais.map(ai => `
+    <span class="ai-mention-btn" onclick="insertMention('${escHtml(ai.name)}')" title="艾特 ${escHtml(ai.name)}">
+      <span class="dot" style="background:${ai.color};"></span>
+      ${escHtml(ai.name)}
+    </span>
+  `).join('');
+}
+
+// 在输入框光标处插入 @名字
+function insertMention(name) {
+  const input = document.getElementById('userInput');
+  const mention = `@${name} `;
+  
+  // 获取当前光标位置
+  const start = input.selectionStart;
+  const end = input.selectionEnd;
+  const text = input.value;
+  
+  // 在光标处插入艾特文字
+  input.value = text.substring(0, start) + mention + text.substring(end);
+  
+  // 将光标移到插入文字之后
+  const newPos = start + mention.length;
+  input.setSelectionRange(newPos, newPos);
+  input.focus();
+}
+            function renderMessages() {
+                const container = document.getElementById('chatMessages');
+                const html = messages.map(m => {
+                    if (m.role === 'system') {
+                        return `<div class="msg system-msg">📌 ${escHtml(m.content)}</div>`;
+                    }
+                    // 用户消息
+if (m.role === 'user') {
+    return `
+    <div class="msg user">
+      <div class="msg-avatar">👤</div>
+      <div class="msg-bubble">
+        <div class="sender-name">${escHtml(userName)}</div>
+        <div>${escHtml(m.content)}</div>
+<div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+  <span class="time-stamp">${fmtTime(m.timestamp)}</span>
+  <span style="display:flex; gap:6px;">
+    <span class="msg-action-btn regenerate-btn" onclick="regenerateMessage('${m.id}')" title="重新生成">🔄</span>
+    <span class="msg-action-btn edit-btn" onclick="editMessage('${m.id}')" title="编辑">✏️</span>
+    <span class="msg-action-btn delete-btn" onclick="deleteMessage('${m.id}')" title="撤回">🗑️</span>
+  </span>
+</div>
+      </div>
+    </div>`;
+}
+// AI消息
+const ai = ais.find(a => a.id === m.aiId);
+const color = ai ? ai.color : '#888';
+const name = m.aiName || 'AI';
+const initial = name.charAt(0).toUpperCase();
+return `
+<div class="msg ai">
+  <div class="msg-avatar" style="background:${color};">${initial}</div>
+  <div class="msg-bubble">
+    <div class="sender-name" style="color:${color};">${escHtml(name)}</div>
+    <div>${formatContent(m.content)}</div>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+      <span class="time-stamp">${fmtTime(m.timestamp)}</span>
+      <span style="display:flex; gap:6px;">
+        <span class="msg-action-btn regenerate-btn" onclick="regenerateMessage('${m.id}')" title="重新生成">🔄</span>
+        <span class="msg-action-btn edit-btn" onclick="editMessage('${m.id}')" title="编辑">✏️</span>
+        <span class="msg-action-btn delete-btn" onclick="deleteMessage('${m.id}')" title="撤回">🗑️</span>
+      </span>
+    </div>
+  </div>
+</div>`;
+                }).join('');
+
+                // 检查是否有loading中的AI
+                const loadingHtml = Array.from(loadingAiIds).map(aiId => {
+                    const ai = ais.find(a => a.id === aiId);
+                    if (!ai) return '';
+                    return `
+                <div class="typing-indicator" id="typing_${aiId}">
+                  <div class="msg-avatar" style="background:${ai.color};font-size:0.7em;">${ai.name.charAt(0).toUpperCase()}</div>
+                  <div class="typing-dots">
+                    <span></span><span></span><span></span>
+                  </div>
+                  <span style="font-size:0.75em;color:var(--text2);">${escHtml(ai.name)} 正在输入...</span>
+                </div>`;
+                }).join('');
+
+                container.innerHTML = html + loadingHtml;
+                scrollToBottom();
+            }
+
+            function updateAiIndicators() {
+                const container = document.getElementById('aiIndicators');
+                if (ais.length === 0) {
+                    container.innerHTML = '<span style="font-size:0.75em;color:var(--text2);">暂无AI配置</span>';
+                    return;
+                }
+                container.innerHTML = ais.map(ai => {
+                    const isLoading = loadingAiIds.has(ai.id);
+                    const cls = isLoading ? 'loading-dot' : '';
+                    return `
+                <span class="ai-indicator">
+                  <span class="dot ${cls}" style="background:${ai.color};"></span>
+                  ${escHtml(ai.name)}
+                  <span style="font-size:0.65em;opacity:0.7;">(${Math.round(ai.normalProb*100)}%/${Math.round(ai.mentionProb*100)}%)</span>
+                </span>`;
+                }).join('');
+            }
+
+            function scrollToBottom() {
+                const container = document.getElementById('chatMessages');
+                requestAnimationFrame(() => {
+                    container.scrollTop = container.scrollHeight;
+                });
+            }
+
+            function escHtml(str) {
+                if (!str) return '';
+                const div = document.createElement('div');
+                div.textContent = str;
+                return div.innerHTML;
+            }
+
+            function formatContent(text) {
+                if (!text) return '';
+                // 简单的markdown处理：代码块和行内代码
+                let html = escHtml(text);
+                // 代码块 ```
+                html = html.replace(/```(\w*)\n?([\s\S]*?)```/g,
+                    '<pre><code>$2</code></pre>');
+                // 行内代码 `...`
+                html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+                // 粗体
+                html = html.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+                // 斜体
+                html = html.replace(/\*([^*]+)\*/g, '<i>$1</i>');
+                return html;
+            }
+
+            // ==================== 侧边栏切换 ====================
+            function toggleSidebar() {
+                const sidebar = document.getElementById('sidebar');
+                const overlay = document.getElementById('sidebarOverlay');
+                if (window.innerWidth <= 900) {
+                    sidebar.classList.toggle('mobile-open');
+                    overlay.classList.toggle('active');
+                } else {
+                    sidebar.classList.toggle('collapsed');
+                }
+            }
+
+            document.getElementById('sidebarOverlay').addEventListener('click', () => {
+                document.getElementById('sidebar').classList.remove('mobile-open');
+                document.getElementById('sidebarOverlay').classList.remove('active');
+            });
+
+            // ==================== 点名检测 ====================
+            function isMentioned(userMessage, aiName) {
+                const msg = userMessage.toLowerCase();
+                const name = aiName.toLowerCase();
+                // 检测 @名字 或直接包含名字
+                if (msg.includes('@' + name)) return true;
+                // 使用更精确的匹配：名字作为独立词出现
+                const regex = new RegExp('\\b' + escapeRegex(name) + '\\b', 'i');
+                return regex.test(msg);
+            }
+
+            function escapeRegex(str) {
+                return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            }
+
+            // ==================== 上下文构建 ====================
+            function buildContext(ai, currentUserMsg) {
+                // 系统消息：包含该AI的prompt和记忆
+                const systemContent = ai.prompt + (ai.memory ? '\n\n[对话历史摘要]\n' + ai.memory : '');
+
+                const contextMsgs = [{ role: 'system', content: systemContent }];
+
+                // 获取所有消息，按时间顺序
+                const allMsgs = [...messages];
+
+                // 如果需要，可以限制最近 maxRounds 条用户消息的上下文（继续使用之前的逻辑）
+                const userMsgIndices = [];
+                allMsgs.forEach((m, i) => {
+                    if (m.role === 'user') userMsgIndices.push(i);
+                });
+                const recentUserIndices = userMsgIndices.slice(-ai.maxRounds);
+                const startIdx = recentUserIndices.length > 0 ? recentUserIndices[0] : 0;
+                const relevantMsgs = allMsgs.slice(startIdx);
+
+                for (const m of relevantMsgs) {
+                    if (m.role === 'user') {
+                        const displayName = userName || '用户';
+                        contextMsgs.push({ role: 'user', content: `[${displayName}]: ${m.content}` });
+                    }else if (m.role === 'ai') {
+                        if (m.aiId === ai.id) {
+                            // 这是该AI自己说的，作为 assistant 角色
+                            contextMsgs.push({ role: 'assistant', content: m.content });
+                        } else {
+                            // 这是其他AI说的，伪装成 user 消息，并加上发言人标签
+                            const otherName = m.aiName || '其他AI';
+                            const labeledContent = `[${otherName}]: ${m.content}`;
+                            contextMsgs.push({ role: 'user', content: labeledContent });
+                        }
+                    }
+                    // 忽略 system 消息
+                }
+
+                // 追加当前用户消息（如果尚未加入）
+                if (currentUserMsg) {
+                    const lastMsg = contextMsgs[contextMsgs.length - 1];
+                    const formatted = `[${userName}]: ${currentUserMsg}`;
+                    if (!lastMsg || lastMsg.role !== 'user' || lastMsg.content !== formatted) {
+                        contextMsgs.push({ role: 'user', content: formatted });
+                    }
+                }
+
+                return contextMsgs;
+            }
+
+            function countRoundsForAi(ai) {
+                // 计算该AI参与的轮数（用户消息数）
+                const userMsgs = messages.filter(m => m.role === 'user');
+                // 只计算该AI有回复的轮次
+                let rounds = 0;
+                for (const uMsg of userMsgs) {
+                    const uIdx = messages.indexOf(uMsg);
+                    // 检查这条用户消息之后是否有该AI的回复
+                    const hasReply = messages.slice(uIdx + 1).some(
+                        m => m.role === 'ai' && m.aiId === ai.id
+                    );
+                    if (hasReply) rounds++;
+                }
+                return rounds;
+            }
+
+            // ==================== 总结机制 ====================
+            async function maybeSummarize(ai) {
+                // 1. 统计该AI目前参与的总轮数（一次用户消息 + 该AI有回复算一轮）
+                let totalRounds = 0;
+                for (let i = 0; i < messages.length; i++) {
+                    if (messages[i].role !== 'user') continue;
+                    // 检查这条用户消息之后是否有该AI的回复
+                    const hasReply = messages.slice(i + 1).some(m => m.role === 'ai' && m.aiId === ai.id);
+                    if (hasReply) totalRounds++;
+                }
+
+                // 2. 从上次总结位置到现在新增了多少轮
+                const newRounds = totalRounds - (ai.lastSummaryRounds || 0);
+                if (newRounds < ai.summaryRounds) return; // 不够阈值，不总结
+
+                // 3. 收集该AI参与过的所有轮次（按顺序）
+                const aiRounds = [];
+                for (let i = 0; i < messages.length; i++) {
+                    if (messages[i].role !== 'user') continue;
+                    const reply = messages.slice(i + 1).find(m => m.role === 'ai' && m.aiId === ai.id);
+                    if (reply) {
+                        aiRounds.push({ user: messages[i], ai: reply });
+                    }
+                }
+
+                // 4. 只取上次总结之后新增的轮次
+                const startIdx = ai.lastSummaryRounds || 0;
+                const newRoundsList = aiRounds.slice(startIdx);
+                // 保留最后20%不总结（让最近的对话保持新鲜）
+                const keepCount = Math.max(1, Math.floor(newRoundsList.length * 0.2));
+                const toSummarize = newRoundsList.slice(0, newRoundsList.length - keepCount);
+                if (toSummarize.length === 0) return;
+
+                // 5. 构造总结提示
+                const summaryText = toSummarize.map(r =>
+                    `用户: ${r.user.content}\n${ai.name}: ${r.ai.content}`
+                ).join('\n---\n');
+
+                const summaryPrompt = `请用简洁的中文总结以下对话的关键内容，保留重要的事实、决策和结论。用2-4句话概括。\n\n对话内容：\n${summaryText}`;
+
+                // 6. 调用总结 API（isSummary = true）
+                try {
+                    const summaryResult = await callAiApi(ai, summaryPrompt, true);
+                    if (summaryResult) {
+                        ai.memory = (ai.memory ? ai.memory + '\n' : '') + `[前${toSummarize.length}轮总结] ` + summaryResult;
+                        // 控制记忆长度
+                        if (ai.memory.length > 2000) {
+                            ai.memory = ai.memory.slice(-2000);
+                        }
+                        // ★★★ 关键：更新已总结轮数 ★★★
+                        ai.lastSummaryRounds = totalRounds;
+                        saveAis();
+                        renderAiCards();
+                        addSystemMessage(`${ai.name} 的记忆已更新（总结了${toSummarize.length}轮新对话）`);
+                    }
+                } catch (e) {
+                    console.warn(`总结失败 (${ai.name}):`, e);
+                    addSystemMessage(`❌ ${ai.name} 总结失败: ${e.message}`);
+                }
+            }
+            // ==================== API调用 ====================
+            async function callAiApi(ai, userMessage, isSummary = false) {
+                const url = (ai.baseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '') + '/chat/completions';
+                const apiKey = ai.apiKey.trim();
+
+                if (!apiKey) {
+                    throw new Error(`${ai.name} 未配置API Key`);
+                }
+
+                let messages;
+                if (isSummary) {
+                    messages = [
+                        { role: 'system', content: '你是一个对话总结助手。请用简洁的中文总结对话。' },
+                        { role: 'user', content: userMessage }
+                    ];
+                } else {
+                    messages = buildContext(ai, userMessage);
+                }
+
+                // 智能调整 max_tokens
+                let maxTokens = 2000; // 默认
+                const modelLower = (ai.model || '').toLowerCase();
+
+                if (isSummary) {
+                    // 总结需要更长的输出，对 Gemini 尤其要大方
+                    if (modelLower.includes('gemini-2.5') || modelLower.includes('gemini-2.0-flash-thinking')) {
+                        maxTokens = 4096;   // 给足够空间
+                    } else if (modelLower.includes('gemini')) {
+                        maxTokens = 3000;
+                    } else {
+                        maxTokens = 2000;   // GPT/Claude 通常够用
+                    }
+                } else {
+                    // 普通对话
+                    if (modelLower.includes('gemini-2.5') || modelLower.includes('gemini-2.0-flash-thinking')) {
+                        maxTokens = 8192;
+                    } else if (modelLower.includes('gemini')) {
+                        maxTokens = 4096;
+                    } else if (modelLower.includes('gpt-4') || modelLower.includes('claude')) {
+                        maxTokens = 4096;
+                    } else {
+                        maxTokens = 2000;
+                    }
+                }
+
+                const body = {
+                    model: ai.model || 'gpt-4o',
+                    messages: messages,
+                    temperature: 0.7,
+                    max_tokens: maxTokens,
+                };
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`,
+                    },
+                    body: JSON.stringify(body),
+                });
+
+                if (!response.ok) {
+                    const errText = await response.text().catch(() => '未知错误');
+                    let errMsg = `HTTP ${response.status}`;
+                    try {
+                        const errJson = JSON.parse(errText);
+                        errMsg = errJson.error?.message || errJson.message || errMsg;
+                    } catch {}
+                    throw new Error(`${ai.name} API错误: ${errMsg}`);
+                }
+
+                const data = await response.json();
+                const content = data.choices?.[0]?.message?.content;
+                if (!content) {
+                    throw new Error(`${ai.name} 返回了空内容`);
+                }
+                return content.trim();
+            }
+
+            // ==================== 发送消息 ====================
+            async function sendMessage() {
+                if (isSending) return;
+                const inputEl = document.getElementById('userInput');
+                const userMsg = inputEl.value.trim();
+                if (!userMsg) return;
+
+                if (ais.length === 0) {
+                    toast('请先添加至少一个AI', 'warn');
+                    return;
+                }
+
+                // 检查是否至少有一个AI配置了API Key
+                const hasAnyKey = ais.some(a => a.apiKey.trim());
+                if (!hasAnyKey) {
+                    toast('请至少为一个AI配置API Key', 'warn');
+                    return;
+                }
+
+                isSending = true;
+                inputEl.value = '';
+                inputEl.style.height = 'auto';
+                document.getElementById('btnSend').disabled = true;
+
+                // 添加用户消息
+                const userMsgObj = {
+                    id: genId(),
+                    role: 'user',
+                    content: userMsg,
+                    timestamp: now(),
+                };
+                messages.push(userMsgObj);
+                saveMessages();
+                renderMessages();
+
+                // 判断哪些AI需要回复
+                const replyingAis = [];
+                for (const ai of ais) {
+                    if (!ai.apiKey.trim()) continue; // 跳过未配置key的AI
+                    const mentioned = isMentioned(userMsg, ai.name);
+                    const prob = mentioned ? ai.mentionProb : ai.normalProb;
+                    const shouldReply = Math.random() < prob;
+                    if (shouldReply) {
+                        replyingAis.push(ai);
+                    }
+                }
+
+                // 如果没有AI被触发，但有点名，则强制点名AI回复
+                if (replyingAis.length === 0) {
+                    const mentionedAis = ais.filter(a => a.apiKey.trim() && isMentioned(userMsg, a.name));
+                    if (mentionedAis.length > 0) {
+                        replyingAis.push(mentionedAis[0]); // 至少有一个被点名的回复
+                    }
+                }
+
+                // 标记loading
+                for (const ai of replyingAis) {
+                    loadingAiIds.add(ai.id);
+                }
+                updateAiIndicators();
+                renderMessages();
+
+                // 并行调用所有需要回复的AI
+                const results = await Promise.allSettled(
+                    replyingAis.map(ai => callAiApi(ai, userMsg, false).then(content => ({ ai, content })))
+                );
+
+                // 处理结果
+                for (const result of results) {
+                    if (result.status === 'fulfilled') {
+                        const { ai, content } = result.value;
+                        const aiMsg = {
+                            id: genId(),
+                            role: 'ai',
+                            aiId: ai.id,
+                            aiName: ai.name,
+                            content: content,
+                            timestamp: now(),
+                        };
+                        messages.push(aiMsg);
+                        // 检查是否需要总结
+                        try {
+                            await maybeSummarize(ai);
+                        } catch (e) {
+                            console.warn('总结检查失败:', e);
+                        }
+                    } else {
+                        const err = result.reason;
+                        const errMsg = err?.message || String(err);
+                        // 尝试从错误中提取AI信息
+                        let aiName = '未知AI';
+                        for (const ai of replyingAis) {
+                            if (errMsg.includes(ai.name)) { aiName = ai.name; break; }
+                        }
+                        addSystemMessage(`❌ ${aiName} 回复失败: ${errMsg}`);
+                    }
+                    // 移除loading
+                    if (result.status === 'fulfilled') {
+                        loadingAiIds.delete(result.value.ai.id);
+                    }
+                }
+                // 清理所有loading（防止有遗漏）
+                for (const ai of replyingAis) {
+                    loadingAiIds.delete(ai.id);
+                }
+
+                saveMessages();
+                updateAiIndicators();
+                renderMessages();
+                isSending = false;
+                document.getElementById('btnSend').disabled = false;
+                inputEl.focus();
+            }
+
+            function addSystemMessage(content) {
+                messages.push({
+                    id: genId(),
+                    role: 'system',
+                    content: content,
+                    timestamp: now(),
+                });
+                saveMessages();
+            }
+
+            // ==================== 输入处理 ====================
+            function handleInputKey(event) {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    sendMessage();
+                }
+                // 自动调整高度
+                const el = event.target;
+                requestAnimationFrame(() => {
+                    el.style.height = 'auto';
+                    el.style.height = Math.min(el.scrollHeight, 150) + 'px';
+                });
+            }
+
+            // ==================== 导入导出 ====================
+            function exportConfig() {
+                const config = ais.map(a => ({
+                    name: a.name,
+                    apiKey: a.apiKey ? '***' + a.apiKey.slice(-4) : '',
+                    baseUrl: a.baseUrl,
+                    model: a.model,
+                    prompt: a.prompt,
+                    maxRounds: a.maxRounds,
+                    summaryRounds: a.summaryRounds,
+                    normalProb: a.normalProb,
+                    mentionProb: a.mentionProb,
+                }));
+                const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'ai-chatroom-config.json';
+                a.click();
+                URL.revokeObjectURL(url);
+                toast('配置已导出（API Key已隐藏）', 'info');
+            }
+
+            function importConfigPrompt() {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.json';
+                input.onchange = async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    try {
+                        const text = await file.text();
+                        const config = JSON.parse(text);
+                        if (!Array.isArray(config)) throw new Error('格式错误');
+                        if (!confirm(
+                                `即将导入 ${config.length} 个AI配置，当前配置将被覆盖。\n注意：API Key需要重新填写。\n确定继续？`
+                                )) return;
+                        ais = config.map((c, i) => ({
+                            id: genId(),
+                            name: c.name || `AI-${i+1}`,
+                            apiKey: '',
+                            baseUrl: c.baseUrl || 'https://api.openai.com/v1',
+                            model: c.model || 'gpt-4o',
+                            prompt: c.prompt || '你是一个有帮助的AI助手。',
+                            maxRounds: c.maxRounds || 20,
+                            summaryRounds: c.summaryRounds || 14,
+                            normalProb: c.normalProb ?? 0.35,
+                            mentionProb: c.mentionProb ?? 0.9,
+                            memory: '',
+                            color: AI_COLORS[i % AI_COLORS.length],
+                            expanded: true,
+                            lastSummaryRounds: 0,   // ← 新加
+                        }));
+                        saveAis();
+                        renderAll();
+                        toast(`成功导入 ${ais.length} 个AI配置，请填写API Key`, 'info');
+                    } catch (e) {
+                        toast('导入失败：文件格式不正确', 'error');
+                    }
+                };
+                input.click();
+            }
+
+            function clearAllMessages() {
+            if (!confirm('确定清空所有聊天记录吗？此操作不会删除AI的记忆摘要。')) return;
+            messages = [];
+            saveMessages();
+            renderMessages();
+            toast('聊天记录已清空，记忆保留', 'info');
+            }
+
+            function resetAllConfig() {
+                if (!confirm('确定重置所有配置吗？这将删除所有AI和聊天记录。此操作不可恢复。')) return;
+                localStorage.removeItem(STORAGE_KEY_AI);
+                localStorage.removeItem(STORAGE_KEY_MSGS);
+                ais = [];
+                messages = [];
+                loadingAiIds.clear();
+                // 重新创建默认AI
+                ais.push(createDefaultAi(0, '小智', '#ff6b6b'));
+                ais.push(createDefaultAi(1, '小雅', '#4dabf7'));
+                saveAis();
+                saveMessages();
+                renderAll();
+                toast('已重置为默认配置', 'info');
+            }
+
+            // ==================== 暴露到全局 ====================
+            window.toggleAiCard = toggleAiCard;
+            window.updateAiField = updateAiField;
+            window.removeAi = removeAi;
+            window.addAi = addAi;
+            window.toggleAllCards = toggleAllCards;
+            window.toggleSidebar = toggleSidebar;
+            window.sendMessage = sendMessage;
+            window.deleteMessage = deleteMessage;
+            window.editMessage = editMessage;
+            window.regenerateMessage = regenerateMessage;
+            window.closeEditModal = closeEditModal;
+            window.saveEdit = saveEdit;
+            window.handleInputKey = handleInputKey;
+            window.exportConfig = exportConfig;
+            window.importConfigPrompt = importConfigPrompt;
+            window.clearAllMessages = clearAllMessages;
+            window.resetAllConfig = resetAllConfig;
+            window.updateUserName = updateUserName;
+            window.insertMention = insertMention;
+            window.renderMentionButtons = renderMentionButtons;
+
+            // ==================== 初始化 ====================
+function deleteMessage(msgId) {
+  if (!confirm('确定删除这条回复吗？所有AI的上下文都会随之更新。')) return;
+  messages = messages.filter(m => m.id !== msgId);
+  saveMessages();
+  renderMessages();
+}
+let currentEditingMsgId = null;
+
+function editMessage(msgId) {
+  const msg = messages.find(m => m.id === msgId);
+  if (!msg || (msg.role !== 'ai' && msg.role !== 'user')) return;
+  
+  currentEditingMsgId = msgId;
+  const modal = document.getElementById('editModal');
+  const textarea = document.getElementById('editTextarea');
+  
+  textarea.value = msg.content;
+  modal.style.display = 'flex';
+  textarea.focus();
+  textarea.setSelectionRange(textarea.value.length, textarea.value.length); // 光标移到末尾
+}
+
+// 重新生成 AI 回复
+async function regenerateMessage(msgId) {
+  // 1. 找到这条消息
+  const msgIndex = messages.findIndex(m => m.id === msgId);
+  const msg = messages[msgIndex];
+  if (!msg || msg.role !== 'ai') return;
+
+  // 2. 找到对应的 AI
+  const ai = ais.find(a => a.id === msg.aiId);
+  if (!ai) {
+    toast('找不到对应的AI配置', 'error');
+    return;
+  }
+
+  // 3. 获取这条消息之前的用户消息（作为触发提问）
+  //    从这条消息向前找到最近的一条用户消息
+  let triggerUserMsg = null;
+  for (let i = msgIndex - 1; i >= 0; i--) {
+    if (messages[i].role === 'user') {
+      triggerUserMsg = messages[i].content;
+      break;
+    }
+  }
+  if (!triggerUserMsg) {
+    toast('找不到触发这条回复的用户消息', 'warn');
+    return;
+  }
+
+  // 4. 构建上下文（不包含当前这条消息）
+  //    我们暂时将这条消息从数组中移除，然后构建上下文，再放回去
+  const savedMsg = messages.splice(msgIndex, 1)[0]; // 移除
+  let contextMsgs;
+  try {
+    contextMsgs = buildContext(ai, triggerUserMsg);
+  } catch (e) {
+    // 出错也要把消息放回去
+    messages.splice(msgIndex, 0, savedMsg);
+    throw e;
+  }
+  // 5. 调用 API 重新生成
+  const regenerateBtn = document.querySelector(`.regenerate-btn[onclick*="${msgId}"]`);
+  if (regenerateBtn) {
+    regenerateBtn.style.pointerEvents = 'none';
+    regenerateBtn.textContent = '⏳';
+  }
+
+  try {
+    const newContent = await callAiApi(ai, triggerUserMsg, false);
+    // 6. 将新内容放回原位置（替换旧消息）
+    savedMsg.content = newContent;
+    savedMsg.timestamp = now(); // 更新时间戳
+    messages.splice(msgIndex, 0, savedMsg);
+    saveMessages();
+    renderMessages();
+    addSystemMessage(`${ai.name} 的回复已重新生成`);
+  } catch (err) {
+    // 出错时把旧消息放回去，恢复原状
+    messages.splice(msgIndex, 0, savedMsg);
+    toast(`重新生成失败: ${err.message}`, 'error');
+    renderMessages();
+  } finally {
+    if (regenerateBtn) {
+      regenerateBtn.style.pointerEvents = 'auto';
+      regenerateBtn.textContent = '🔄';
+    }
+  }
+}
+
+function closeEditModal(event) {
+  // 如果点击背景关闭（event参数存在），且点击的不是背景本身，不处理
+  if (event && event.target !== document.getElementById('editModal')) return;
+  
+  document.getElementById('editModal').style.display = 'none';
+  currentEditingMsgId = null;
+}
+
+function saveEdit() {
+  if (!currentEditingMsgId) return;
+  const msg = messages.find(m => m.id === currentEditingMsgId);
+  if (!msg) return;
+  
+  const newContent = document.getElementById('editTextarea').value.trim();
+  if (newContent === '') {
+    alert('内容不能为空');
+    return;
+  }
+  
+  msg.content = newContent;
+  msg.timestamp = now(); // 更新时间戳
+  saveMessages();
+  renderMessages();
+  closeEditModal();
+}
+
+// 绑定保存按钮事件（确保只绑定一次）
+document.addEventListener('DOMContentLoaded', function() {
+  const saveBtn = document.getElementById('saveEditBtn');
+  if (saveBtn) saveBtn.addEventListener('click', saveEdit);
+});
+// 如果 DOM 已加载，直接绑定
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+  setTimeout(() => {
+    const saveBtn = document.getElementById('saveEditBtn');
+    if (saveBtn && !saveBtn._bound) {
+      saveBtn.addEventListener('click', saveEdit);
+      saveBtn._bound = true;
+    }
+  }, 100);
+}
+            function init() {
+                loadAis();
+                loadMessages();
+                loadUserName();
+                document.getElementById('userNameInput').value = userName;
+                renderAll();
+                updateAiIndicators();
+                document.getElementById('userInput').focus();
+
+                // 窗口大小变化时更新侧边栏状态
+                window.addEventListener('resize', () => {
+                    const sidebar = document.getElementById('sidebar');
+                    const overlay = document.getElementById('sidebarOverlay');
+                    if (window.innerWidth > 900) {
+                        sidebar.classList.remove('mobile-open');
+                        overlay.classList.remove('active');
+                    }
+                });
+
+                console.log('🤖 AI 聊天室已就绪');
+                console.log(`   - ${ais.length} 个AI已加载`);
+                console.log(`   - ${messages.length} 条历史消息`);
+                console.log('   - 在消息中使用 @AI名字 点名特定AI');
+            }
+
+            init();
+        })();
+    </script>
+<!-- 编辑消息模态框 -->
+<div id="editModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:200; align-items:center; justify-content:center;" onclick="closeEditModal(event)">
+  <div style="background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px; width:90%; max-width:600px; max-height:85vh; display:flex; flex-direction:column; gap:12px; box-shadow:var(--shadow);" onclick="event.stopPropagation()">
+    <h3 style="margin:0; color:var(--text);">✏️ 编辑消息</h3>
+    <textarea id="editTextarea" style="width:100%; min-height:150px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px; font-size:0.9em; font-family:inherit; resize:vertical; line-height:1.6;" placeholder="输入新内容..."></textarea>
+    <div style="display:flex; gap:8px; justify-content:flex-end;">
+      <button class="btn-sm" onclick="closeEditModal()">取消</button>
+      <button class="btn-send" id="saveEditBtn" style="padding:8px 18px;">保存更改</button>
+    </div>
+  </div>
+</div> 
+</body>
+</html>
