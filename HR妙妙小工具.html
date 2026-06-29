@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>简历批量匹配(AI岗位) · 旗舰版</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>📋</text></svg>">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
 <style>
@@ -88,7 +89,7 @@ textarea:focus { outline: none; border-color: var(--primary); background: #FFF; 
 .api-inputs { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 16px; margin-bottom: 12px; }
 .api-inputs input { width: 100%; padding: 12px 16px; border: 1px solid #93C5FD; border-radius: 8px; font-size: 14px; outline: none; transition: 0.2s; background: #FFFFFF; }
 .api-inputs input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15); }
-.ai-hint { color: #3B82F6; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+.ai-hint { color: #3B82F6; font-size: 13px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
 
 /* 按钮及表格样式 */
 .btn { background: var(--primary); color: #fff; border: none; padding: 16px 48px; border-radius: 12px; cursor: pointer; font-size: 16px; font-weight: 600; transition: all 0.2s; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2); }
@@ -182,6 +183,7 @@ tr:hover td { background: #F8FAFC; }
       </div>
       <div class="ai-hint">
         <span>💡 <b>提示:</b>使用 API 调用大模型需要向 AI 公司付费,推荐使用 DeepSeek 物美价廉。API Key 需要自己申请,如果嫌麻烦,可以撒娇找姐姐提供"爱心经济支持" 💖</span>
+        <div style="margin-top:6px;"><a href="https://platform.deepseek.com/api_keys" target="_blank" style="color:#4F46E5;font-weight:600;text-decoration:underline;">🔗 申请 API Key 直通车：platform.deepseek.com/api_keys</a></div>
       </div>
       <label class="switch-label" style="margin-top:12px;font-size:14px;">
         <input type="checkbox" id="genQuestions" style="width:18px;height:18px;">
